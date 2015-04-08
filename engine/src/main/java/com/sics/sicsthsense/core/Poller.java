@@ -36,8 +36,13 @@ import java.io.DataOutputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URI;
 import java.net.MalformedURLException;
 import javax.net.ssl.HttpsURLConnection;
+
+import org.eclipse.californium.core.CoapClient;
+import org.eclipse.californium.core.CoapResponse;
+import org.eclipse.californium.core.coap.MediaTypeRegistry;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,6 +63,7 @@ public class Poller extends UntypedActor {
 	private ParseData parsedata;
 	private StorageDAO storage;
 	private URL urlobj;
+	private URI uriobj;
 	private String inputLine;
 	private List<Parser> parsers;
 
@@ -80,11 +86,17 @@ public class Poller extends UntypedActor {
 			logger.error("Url not valid");
 			return;
 		}
+
 		try {
 			urlobj = new URL(url);
 		} catch (Exception e) {
-			//logger.error("Bad url: "+e);
-			return;
+			logger.error("Bad URL: "+e);			
+			try {
+				uriobj = new URI(url);
+			} catch (Exception err) {
+				logger.error("Bad URI: "+err);
+				return;
+			}
 		}
 		parsers = storage.findParsersByResourceId(resourceId);
 	}
@@ -133,12 +145,32 @@ public class Poller extends UntypedActor {
   public void onReceive(Object message) throws Exception {
 		//logger.info("Received String message: to probe: {}");
     if (message instanceof String) {
-			if (message.equals("rebuild")) {
-				rebuild();
-			} else { // "probe"
-				//logger.info("Received String message: to probe: {}", url);
-				//getSender().tell(message, getSelf());
-				if (urlobj==null) { logger.error("URL object was null!"); return;}
+		if (message.equals("rebuild")) {
+			rebuild();
+		} else { // "probe"
+			//logger.info("Received String message: to probe: {}", url);
+			//getSender().tell(message, getSelf());
+			if (urlobj==null) { 
+				logger.error("URL object was null!"); 
+				if (uriobj==null) { 
+					logger.error("URI object was null!"); 
+					return;
+				} else {
+					CoapClient client = new CoapClient(uriobj);
+					CoapResponse response = null;
+					response = client.get(MediaTypeRegistry.TEXT_PLAIN);
+					if (response != null) {
+						storage.polledResource(resourceId,System.currentTimeMillis());
+						applyParsers(resourceId, response.getResponseText());
+					} else {
+						ResourceLog rl = ResourceLog.createOrUpdate(storage, resourceId);
+						String msg = "Network problem: Coap URL: "+url;
+						rl.update(false, true, msg, System.currentTimeMillis());
+						rl.save();
+					}
+				
+				}	
+			} else {
 				HttpURLConnection con = (HttpURLConnection)urlobj.openConnection();
 				con.setRequestMethod("GET"); // optional default is GET
 				con.setInstanceFollowRedirects(true);
@@ -165,8 +197,9 @@ public class Poller extends UntypedActor {
 					rl.save();
 				}
 			}
-    } else {
-      unhandled(message);
 		}
+    } else {
+      		unhandled(message);
+    }
   }
 }

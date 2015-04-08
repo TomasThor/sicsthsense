@@ -446,7 +446,7 @@ public class Resource extends Model {
 
         return resource;
     }
-				rebuildEngineResource(resource.owner.getId(), resource.id);
+				//rebuildEngineResource(resource.owner.getId(), resource.id);
 
     public static void delete(Long id) {
         Updater.stopObserve(id);

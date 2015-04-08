@@ -61,6 +61,7 @@ create table IF NOT EXISTS resource_log (
   resource_id               bigint,
   creation_timestamp        bigint,
   response_timestamp        bigint,
+  interaction_type          enum('U', 'D', 'P', 'O') not null,
   parsed_successfully       tinyint(1) default 0,
   is_poll                   tinyint(1) default 0,
   body                      varchar(8192),
@@ -157,9 +158,9 @@ create table IF NOT EXISTS vfiles (
   path                      varchar(255) not null,
   owner_id                  bigint,
   type                      varchar(1) not null,
-  linked_stream_id          bigint,
+  stream_id          bigint,
   constraint ck_vfiles_type check (type in ('F','D')),
-  constraint uq_vfiles_1 unique (linked_stream_id,path),
+  constraint uq_vfiles_1 unique (stream_id,path),
   constraint pk_vfiles primary key (id))
 ;
 
@@ -201,8 +202,8 @@ create index ix_parsers_stream_11 on parsers (stream_id);
 alter table vfiles add constraint fk_vfiles_owner_12 foreign key (owner_id) references users (id) on delete restrict on update restrict;
 create index ix_vfiles_owner_12 on vfiles (owner_id);
 #Liam:causes awkwardness
-#alter table vfiles add constraint fk_vfiles_linkedStream_13 foreign key (linked_stream_id) references streams (id) on delete restrict on update restrict;
-create index ix_vfiles_linkedStream_13 on vfiles (linked_stream_id);
+#alter table vfiles add constraint fk_vfiles_linkedStream_13 foreign key (stream_id) references streams (id) on delete restrict on update restrict;
+create index ix_vfiles_linkedStream_13 on vfiles (stream_id);
 
 create index ix_dependents_stream_14 on dependents (stream_id);
 create index ix_dependents_dependent_15 on dependents (dependent_id);

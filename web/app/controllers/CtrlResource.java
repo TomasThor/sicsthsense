@@ -33,6 +33,7 @@ package controllers;
 import logic.ResourceHub;
 import java.util.ArrayList;
 import models.Resource;
+import models.Stream;
 import models.StreamParser;
 import models.User;
 import models.Engine;
@@ -62,7 +63,8 @@ import java.util.regex.PatternSyntaxException;
 
 public class CtrlResource extends Controller {
     private final static Logger.ALogger logger = Logger.of(CtrlResource.class);
-
+    
+    static public int pageSize = 10;
     static private Form<SkeletonResource> skeletonResourceForm = Form.form(SkeletonResource.class);
     static private Form<Resource> resourceForm = Form.form(Resource.class);
 
@@ -127,7 +129,7 @@ public class CtrlResource extends Controller {
 
         switch (result.code()) {
             case Ok:
-                return redirect(routes.CtrlResource.resources());
+                return redirect(routes.CtrlResource.resources(0));
             case InternalError:
             default:
                 return internalServerError();
@@ -162,7 +164,7 @@ public class CtrlResource extends Controller {
 
         switch (result.code()) {
             case Ok:
-			Resource.rebuildEngineResource(resource.owner.getId(),id);
+			//Resource.rebuildEngineResource(resource.owner.getId(),id);
                 return redirect(routes.CtrlResource.getById(id));
             case NotFound:
                 return badRequest("Resource does not exist: " + id);
@@ -191,7 +193,8 @@ public class CtrlResource extends Controller {
 
         if (!resource.hasUrl()) {
             Form<SkeletonResource> myForm = skeletonResourceForm.fill(skeleton);
-            return ok(resourcePage.render(currentUser.resourceList, myForm, false, "The resource has no polling url defined"));
+	    List<Stream> streams = new ArrayList<Stream>();
+            return ok(resourcePage.render(currentUser.resourceList, myForm, streams, false, "The resource has no polling url defined"));
         }
 
         // fudge URL, should check HTTP
@@ -207,7 +210,8 @@ public class CtrlResource extends Controller {
             logger.error("Auto add parser failed", e);
 
             Form<SkeletonResource> myForm = skeletonResourceForm.fill(skeleton);
-            return ok(resourcePage.render(currentUser.resourceList, myForm, false,
+            List<Stream> streams = new ArrayList<Stream>();
+            return ok(resourcePage.render(currentUser.resourceList, myForm, streams, false,
                     "Error polling resource URL: " + resource.getPollingUrl()));
         }
 
@@ -228,8 +232,9 @@ public class CtrlResource extends Controller {
 
         final Form<SkeletonResource> skeletonResourceFormNew = skeletonResourceForm.fill(skeleton);
 
+        List<Stream> streams = new ArrayList<Stream>(); 
         return ok(views.html.resourcePage.render(currentUser.resourceList, skeletonResourceFormNew,
-                false, "Parsers automatically added."));
+                streams, false, "Parsers automatically added."));
     }
 
     @Security.Authenticated(Secured.class)

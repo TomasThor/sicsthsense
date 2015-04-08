@@ -34,7 +34,7 @@ import controllers.Utils;
 import logic.Argument;
 import logic.StreamDrive;
 import logic.State;
-import org.codehaus.jackson.JsonNode;
+import com.fasterxml.jackson.databind.JsonNode;
 import play.Logger;
 import play.db.ebean.Model;
 import play.libs.Json;
@@ -308,7 +308,7 @@ public class StreamParser extends Model {
         if (node.isMissingNode()) {
             // Do nothing
         } else if (node.isValueNode()) { // it is a simple primitive
-            data.add(new DataPointDouble(node.getDoubleValue(), currentTime));
+            data.add(new DataPointDouble(node.asDouble(), currentTime));
 
         } else if (node.get("value") != null) { // it may be value:X
             double value = node.get("value").asDouble();

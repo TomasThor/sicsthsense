@@ -451,11 +451,6 @@ public class Stream extends Model implements Comparable<Stream> {
         Stream stream = find.byId(id);
         if (stream != null) stream.delete();
     }
-    
-    public static List<Stream> availableStreams(User currentUser, Integer p) {
-        List<Stream> available = find.where().or(Expr.eq("publicSearch", true), Expr.eq("owner", currentUser))
-                        .orderBy("owner").orderBy("id asc").findPagingList(CtrlStream.pageSize).getPage(p.intValue()).getList();
-
 
     public static List<Stream> availableStreams(User currentUser, Integer p) {
         List<Stream> available =

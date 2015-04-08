@@ -6,9 +6,9 @@ database:
   # the name of your JDBC driver
   driverClass: com.mysql.jdbc.Driver
   # the username
-  user: sicsthsense
+  user: root
   # the password
-  password: 6S3NLd2un76CrE3RJXs
+  password: user
   # the JDBC URL
   url: jdbc:mysql://localhost:3306/sicsth2
 

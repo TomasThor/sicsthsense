@@ -14,5 +14,5 @@ resolvers += "Sonatype snapshots" at "http://oss.sonatype.org/content/repositori
 addSbtPlugin("com.typesafe.play" % "sbt-plugin" % "2.2.3-RC2")
 //addSbtPlugin("com.typesafe.play" % "sbt-plugin" % Option(System.getProperty("play.version")).getOrElse("2.0"))
 
-addSbtPlugin("com.github.mpeltonen" % "sbt-idea" % "1.6.0-SNAPSHOT")
+//addSbtPlugin("com.github.mpeltonen" % "sbt-idea" % "1.6.0-SNAPSHOT")
 
