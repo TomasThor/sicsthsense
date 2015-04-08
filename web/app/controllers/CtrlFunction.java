@@ -11,17 +11,18 @@
  *     * Neither the name of The Swedish Institute of Computer Science nor the
  *       names of its contributors may be used to endorse or promote products
  *       derived from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE SWEDISH INSTITUTE OF COMPUTER SCIENCE BE LIABLE 
+ * DISCLAIMED. IN NO EVENT SHALL THE SWEDISH INSTITUTE OF COMPUTER SCIENCE BE LIABLE
  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
  * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
  * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
  * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 
 /* Description:
  * TODO:
@@ -32,7 +33,7 @@ package controllers;
 import java.util.List;
 
 import models.DataPoint;
-import models.FileSystem;
+import logic.StreamDrive;
 import models.Function;
 import models.Stream;
 import models.User;
@@ -55,7 +56,7 @@ public class CtrlFunction extends Controller {
 	static private Form<Function> functionForm = Form.form(Function.class);
 
 	@Security.Authenticated(Secured.class)
-	public static Result attach() {		
+	public static Result attach() {
 		Form<Function> theForm = functionForm.bindFromRequest();
 		if(theForm.hasErrors()) {
 		  return badRequest("Bad request");
@@ -68,11 +69,11 @@ public class CtrlFunction extends Controller {
 	}
 
 
-	@Security.Authenticated(Secured.class)      
+	@Security.Authenticated(Secured.class)
   public static Result edit() {
     return TODO; //ok(accountPage.render(getUser(), userForm));
   }
-	
+
 	@Security.Authenticated(Secured.class)
 	public static Result modify(Long id) {
 		/*
@@ -91,9 +92,9 @@ public class CtrlFunction extends Controller {
 				return badRequest("Bad request");
 			}
 		  return redirect(routes.CtrlResource.resources(0));
-		}    
+		}
   }
-	
+
 
 	@Security.Authenticated(Secured.class)
 	public static Result getById(Long id) {
@@ -113,7 +114,7 @@ public class CtrlFunction extends Controller {
 	public static Result getDataById(Long id, Long tail, Long last, Long since) {
 		final User user = Secured.getCurrentUser();
 		// if(user == null) return notFound();
-		Stream stream = Stream.get(id);
+		Stream stream = Stream.getById(id);
 		if (stream == null) {
 			return notFound();
 		}
@@ -131,7 +132,7 @@ public class CtrlFunction extends Controller {
 	// @Security.Authenticated(Secured.class)
 	private static Result getData(User currentUser, User owner, String path,
 			Long tail, Long last, Long since) {
-		Vfile f = FileSystem.readFile(owner, path);
+		Vfile f = StreamDrive.read(owner, path);
 		if (f == null) {
 			return notFound();
 		}

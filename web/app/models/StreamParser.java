@@ -1,86 +1,77 @@
 /*
- * Copyright (c) 2013, Swedish Institute of Computer Science All rights reserved. Redistribution and
- * use in source and binary forms, with or without modification, are permitted provided that the
- * following conditions are met: * Redistributions of source code must retain the above copyright
- * notice, this list of conditions and the following disclaimer. * Redistributions in binary form
- * must reproduce the above copyright notice, this list of conditions and the following disclaimer
- * in the documentation and/or other materials provided with the distribution. * Neither the name of
- * The Swedish Institute of Computer Science nor the names of its contributors may be used to
- * endorse or promote products derived from this software without specific prior written permission.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR
- * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
- * FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE SWEDISH INSTITUTE OF
- * COMPUTER SCIENCE BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
- * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
- * OF SUCH DAMAGE.
- */
+ * Copyright (c) 2013, Swedish Institute of Computer Science
+ * All rights reserved.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in the
+ *       documentation and/or other materials provided with the distribution.
+ *     * Neither the name of The Swedish Institute of Computer Science nor the
+ *       names of its contributors may be used to endorse or promote products
+ *       derived from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE SWEDISH INSTITUTE OF COMPUTER SCIENCE BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-/*
- * Description: TODO:
+ * Authors:
+ *  26/08/2013 Adrian Kündig (adkuendi@ethz.ch)
+ *  Before     Unknown
  */
 
 package models;
 
-import java.text.DateFormat;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.Locale;
-import java.util.Random;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.regex.PatternSyntaxException;
-
-import javax.persistence.Entity;
-import javax.persistence.Id;
-import javax.persistence.ManyToOne;
-import javax.persistence.Table;
-import javax.persistence.Transient;
-
-import com.fasterxml.jackson.databind.JsonNode;
-
+import controllers.Utils;
+import logic.Argument;
+import logic.StreamDrive;
+import logic.State;
+import org.codehaus.jackson.JsonNode;
 import play.Logger;
 import play.db.ebean.Model;
 import play.libs.Json;
-import play.mvc.Http.Request;
-import protocol.Response;
-import controllers.Utils;
+
+import javax.persistence.*;
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Entity
 @Table(name = "parsers")
 public class StreamParser extends Model {
+    private final static Logger.ALogger logger = Logger.of(StreamParser.class);
 
     /**
      * The serialization runtime associates with each serializable class a version number, called a
      * serialVersionUID
      */
     private static final long serialVersionUID = 2972078391685154152L;
-    // public static enum parserType {
-    // @EnumValue("R")
-    // REGEX,
-    // @EnumValue("J")
-    // JSON,
-    // @EnumValue("X")
-    // XPATH
-    // };
 
     @Id
     public Long id;
 
-    @ManyToOne
+    // A Resource can have many StreamParsers attached
+    @ManyToOne(optional = false)
     public Resource resource;
 
-    @ManyToOne
+    // A Stream can be posted to from many
+    @ManyToOne(optional = false)
     public Stream stream;
 
-    @Transient
-    public String streamVfilePath;
-
-    /** RegEx, Xpath, JSON path, CSV separator */
+    /**
+     * RegEx, Xpath, JSON path, CSV separator
+     */
     public String inputParser;
 
     /**
@@ -112,9 +103,6 @@ public class StreamParser extends Model {
      */
     public int numberOfPoints = 1;
 
-    @Transient
-    public Pattern regexPattern;
-
     public static Model.Finder<Long, StreamParser> find = new Model.Finder<Long, StreamParser>(
             Long.class, StreamParser.class);
 
@@ -122,151 +110,64 @@ public class StreamParser extends Model {
         super();
     }
 
-    public StreamParser(Resource resource, String inputParser, String inputType, String path,
-            String timeformat, int dataGroup, int timeGroup, int numberOfPoints) throws Exception {
+    public StreamParser(String inputParser, String inputType,
+                        String timeformat, int dataGroup, int timeGroup, int numberOfPoints) {
         super();
-				setInputParser(inputParser);
-				this.inputType = inputType;
-				this.resource = resource;
-				this.streamVfilePath = path;
-				this.timeformat = timeformat;
-				this.dataGroup = dataGroup;
-				this.timeGroup = timeGroup;
-				this.numberOfPoints = numberOfPoints;
-				Vfile f = FileSystem.readFile(resource.owner, path);
-				this.stream = (f != null) ? f.linkedStream : null;
-    }
 
-    public StreamParser(Resource resource, String inputParser, String inputType, Stream stream,
-            String timeformat, int dataGroup, int timeGroup, int numberOfPoints)  throws Exception {
-        super();
-        setInputParser(inputParser);
+        this.inputParser = inputParser;
         this.inputType = inputType;
-        this.resource = resource;
-        this.stream = stream;
         this.timeformat = timeformat;
         this.dataGroup = dataGroup;
         this.timeGroup = timeGroup;
         this.numberOfPoints = numberOfPoints;
-        if (stream != null && stream.file != null) {
-            this.streamVfilePath = stream.file.path;
-        }
     }
 
-    public boolean setInputParser(String inputParser) throws Exception {
+    public StreamParser(Resource resource, String inputParser, String inputType, String path,
+                        String timeformat, int dataGroup, int timeGroup, int numberOfPoints) {
+        super();
+
+        Argument.notNull(resource);
+        Argument.notEmpty(path);
+
         this.inputParser = inputParser;
-        if (inputParser != null) {
-		         regexPattern = Pattern.compile(inputParser);
-            if (this.id != null) {
-                this.update();
-            }
-            return true;
+        this.inputType = inputType;
+        this.resource = resource;
+        this.timeformat = timeformat;
+        this.dataGroup = dataGroup;
+        this.timeGroup = timeGroup;
+        this.numberOfPoints = numberOfPoints;
+
+        if (resource.owner != null) {
+            Vfile f = StreamDrive.read(resource.owner, path);
+            this.stream = (f != null) ? f.stream : null;
+
         }
-        return false;
     }
 
-    public boolean parseRequest(Request request, Long currentTime) throws Exception {
+    public StreamParser updateStreamParser(StreamParser changes) {
+        this.inputParser = changes.inputParser;
+        this.inputType = changes.inputType;
+        this.dataGroup = changes.dataGroup;
+        this.numberOfPoints = changes.numberOfPoints;
+        this.timeformat = changes.timeformat;
+        this.timeGroup = changes.timeGroup;
+
+        save();
+
+        return this;
+    }
+
+    public List<DataPoint> parse(String body, String contentType) throws Exception {
         // Logger.info("StreamParser: parseResponse(): post: "+stream.file.getPath());
         if ("application/json".equalsIgnoreCase(inputType)
-                || "application/json".equalsIgnoreCase(request.getHeader("Content-Type"))) {
-            JsonNode jsonBody = request.body().asJson();
+                || "application/json".equalsIgnoreCase(contentType)) {
+            JsonNode jsonBody = Json.parse(body);
             // Logger.info("[StreamParser] as json");
-            return parseJsonResponse(jsonBody, currentTime);
+            return parseJson(jsonBody);
         } else {
-            String textBody = request.body().asText(); // request.body().asRaw().toString();
             // Logger.info("[StreamParser] as text");
-            return parseTextResponse(textBody, currentTime);
+            return parseText(body);
         }
-    }
-
-    /**
-     * parseResponse chooses the parser based on content-type. inputType overrides the content-type.
-     * returns: true if could post
-     */
-    public boolean parseResponse(Response response, Long currentTime) throws Exception {
-        // Logger.info("StreamParser: parseResponse(): poll: "+stream.file.getPath());
-        if ("application/json".equalsIgnoreCase(inputType)
-                || "application/json".equalsIgnoreCase(response.contentType())) {
-            JsonNode jsonBody = Json.parse(response.body());
-            return parseJsonResponse(jsonBody, currentTime);
-        } else if ("text/csv".equalsIgnoreCase(inputType)
-                || "text/csv".equalsIgnoreCase(response.contentType())) {
-            String textBody = response.body();
-            return parseCSVdata(textBody, currentTime);
-        } else {
-            String textBody = response.body();
-            return parseTextResponse(textBody, currentTime);
-        }
-    }
-
-    /**
-     * Parses the request using inputParser as regex and posts the first match
-     * 
-     * @param textBody
-     * @return true if could post
-     */
-    private boolean parseTextResponse(String textBody, Long currentTime)
-            throws NumberFormatException, Exception {
-        boolean success = false;
-        // try {
-        double number = 0.0;
-        String value = "", time = "";
-        if (stream != null && inputParser != null && !inputParser.equalsIgnoreCase("")) {
-            regexPattern = Pattern.compile(inputParser);
-            Matcher matcher = regexPattern.matcher(textBody);
-            for (int i = 0; (i < numberOfPoints || numberOfPoints < 1) && textBody != null
-                    && matcher.find(); i++) {
-                // try to match value from the group called :value: otherwise, use the first
-                // matching group
-                try {
-                    value = matcher.group("value");
-                } catch (IllegalArgumentException iae) {
-                    try {
-                        value = matcher.group(dataGroup);
-                    } catch (IndexOutOfBoundsException iob) {
-                        value = matcher.group(1);
-                    }
-                }
-                number = Double.parseDouble(value);
-
-                // try to match time from the group called :time: otherwise, use the second matching
-                // group
-                try {
-                    time = matcher.group("time");
-                } catch (IllegalArgumentException iae) {
-                    try {
-                        time = matcher.group(timeGroup);
-                    } catch (IndexOutOfBoundsException iob) {
-                        time = null;
-                    }
-                }
-
-                // if there is a match for time, parse it; otherwise, use the system time (provided
-                // in the parameter currentTime)
-                if (time != null) {
-                    if (timeformat != null && !"".equalsIgnoreCase(timeformat)
-                            && !"unix".equalsIgnoreCase(timeformat)) {
-                        // inputParser REGEX should match the whole date/time string! It is
-                        // not enough to provide the time format only!
-                        currentTime = parseDateTime(time);
-                    } else {
-                        currentTime = Long.parseLong(time);
-                    }
-                }
-            }
-            success |= stream.post(number, currentTime);
-        } else {
-            number = Double.parseDouble(textBody);
-            success |= stream.post(number, currentTime);
-        }
-        // } catch (NumberFormatException e) {
-        // Logger.warn("StreamParser: Regex failed to parse a number!" + e);
-        // // naughty rogue value
-        // //return stream.post(-1, currentTime);
-        // } catch (Exception e) {
-        // Logger.error("StreamParser: Regex failed!" + e.getMessage());
-        // }
-        return success;
     }
 
     private Long parseDateTime(String input) {
@@ -275,31 +176,97 @@ public class StreamParser extends Model {
         try {
             result = df.parse(input).getTime();
         } catch (ParseException e) {
-            Logger.info("[StreamParser] Exception " + e.getMessage()
-                    + e.getStackTrace()[0].toString());
-            Logger.info("[StreamParser] Exception timeformat: " + timeformat + "input: " + input);
+            logger.error("Error while parsing timeformat: " + timeformat + ", input: " + input, e);
         }
         return result;
     }
 
-    private boolean parseCSVdata(String data, Long currentTime) {
-        boolean success = false;
-        String time = null;
-        int timeIndex = timeGroup - 1;
-        int dataIndex = dataGroup - 1;
-        String[] separators = inputParser.split("_SEP_");
-        String fieldSeparator = separators[0];
-        String lineSeparator = (separators.length > 1) ? separators[1] : "";
-        String[] lines = data.split(lineSeparator);
-        String[] fields;
-        for (int i = 0; (i < numberOfPoints || numberOfPoints < 1) && i < lines.length; i++) {
-            fields = lines[i].split(fieldSeparator);
-            if (timeIndex > -1 && timeIndex < fields.length) {
-                time = fields[timeIndex];
+    /**
+     * Parses the request using inputParser as regex and returns the first match
+     */
+    private List<DataPoint> parseText(String text) throws Exception {
+        long currentTime = Utils.currentTime();
+        final Vector<DataPoint> data = new Vector<DataPoint>();
+
+        if (text == null || "".equalsIgnoreCase(text)) {
+            return data;
+        }
+
+        if (inputParser == null && inputParser.equalsIgnoreCase("")) {
+            data.add(new DataPointDouble(Double.parseDouble(text), currentTime));
+        } else {
+            final Pattern pattern = Pattern.compile(inputParser);
+            final Matcher matcher = pattern.matcher(text);
+
+            for (int i = 0; (i < numberOfPoints || numberOfPoints < 1) && matcher.find(); i++) {
+                String valueString = null;
+
+                // try to match value from the group called :value: otherwise, use the first
+                // matching group
+                try {
+                    valueString = matcher.group("value");
+                } catch (IllegalArgumentException iae) {
+                    try {
+                        valueString = matcher.group(dataGroup);
+                    } catch (IndexOutOfBoundsException iob) {
+                        valueString = matcher.group(1);
+                    }
+                }
+
+                String timeString = null;
+
+                // try to match time from the group called :time: otherwise, use the second matching
+                // group
+                try {
+                    timeString = matcher.group("time");
+                } catch (IllegalArgumentException iae) {
+                    try {
+                        timeString = matcher.group(timeGroup);
+                    } catch (IndexOutOfBoundsException iob) {
+                    }
+                }
+
+                // if there is a match for time, parse it; otherwise, use the system time (provided
+                // in the parameter currentTime)
+                if (timeString != null) {
+                    if (timeformat != null && !"".equalsIgnoreCase(timeformat)
+                            && !"unix".equalsIgnoreCase(timeformat)) {
+                        // inputParser REGEX should match the whole date/time string! It is
+                        // not enough to provide the time format only!
+                        currentTime = parseDateTime(timeString);
+                    } else {
+                        currentTime = Long.parseLong(timeString);
+                    }
+                }
+
+                data.add(new DataPointDouble(Double.parseDouble(valueString), currentTime));
             }
-            // if there is a match for time, parse it; otherwise, use the system time
-            // (provided in the parameter currentTime)
-            if (time != null) {
+        }
+
+        return data;
+    }
+
+    private List<DataPoint> parseCSV(String text) {
+        long currentTime = Utils.currentTime();
+        final Vector<DataPoint> data = new Vector<DataPoint>();
+
+        final String[] separators = inputParser.split("_SEP_");
+        final String fieldSeparator = separators[0];
+        final String lineSeparator = (separators.length > 1) ? separators[1] : "";
+
+        final int timeIndex = timeGroup - 1;
+        final int dataIndex = dataGroup - 1;
+
+        final String[] lines = text.split(lineSeparator);
+        final int maxIndex =
+                numberOfPoints < 1 ? Math.min(numberOfPoints, lines.length) : lines.length;
+
+        for (int i = 0; i < maxIndex; i++) {
+            final String[] fields = lines[i].split(fieldSeparator);
+
+            if (timeIndex > -1 && timeIndex < fields.length) {
+                String time = fields[timeIndex];
+
                 if (timeformat != null && !"".equalsIgnoreCase(timeformat.trim())
                         && !"unix".equalsIgnoreCase(timeformat.trim())) {
                     // inputParser REGEX should match the whole date/time string! It is
@@ -309,35 +276,39 @@ public class StreamParser extends Model {
                     currentTime = Long.parseLong(time);
                 }
             }
-            Double number = Double.parseDouble(fields[dataIndex]);
-            success |= stream.post(number, currentTime);
+
+            Double value = Double.parseDouble(fields[dataIndex]);
+            data.add(new DataPointDouble(value, currentTime));
         }
-        return success;
+
+        return data;
     }
 
     /*
      * parses requests as JSON inputParser is used as the path to the nested json node i.e.
      * inputParser could be: room1/sensors/temp/value
      */
-    private boolean parseJsonResponse(JsonNode root, Long currentTime) {
+    private List<DataPoint> parseJson(JsonNode root) {
         // TODO check concat path against inputParser, get the goal and stop
         // TODO (linear time) form a list of nested path elements from the gui, and
+        long currentTime = Utils.currentTime();
+        final Vector<DataPoint> data = new Vector<DataPoint>();
+
         if (root == null) {
-            return false;
-        }
-        String[] levels = inputParser.split("/");
-        JsonNode node = root;
-        for (int i = 1; i < levels.length; i++) {
-            //Logger.info(levels[i]);
-            node = node.get(levels[i]);
-            if (node == null) {
-                return false;
-            }
+            return data;
         }
 
-        if (node.isValueNode()) { // it is a simple primitive
-            //Logger.info("posting: " + node.getDoubleValue() + " " + Utils.currentTime());
-            return stream.post(node.asDouble(), Utils.currentTime());
+        String[] levels = inputParser.split("/");
+        JsonNode node = root;
+
+        for (int i = 1; i < levels.length; i++) {
+            node = node.path(levels[i]);
+        }
+
+        if (node.isMissingNode()) {
+            // Do nothing
+        } else if (node.isValueNode()) { // it is a simple primitive
+            data.add(new DataPointDouble(node.getDoubleValue(), currentTime));
 
         } else if (node.get("value") != null) { // it may be value:X
             double value = node.get("value").asDouble();
@@ -351,75 +322,54 @@ public class StreamParser extends Model {
                     currentTime = node.get("time").asLong();
                 }
             }
-            //Logger.info("posting: " + node.getDoubleValue() + " " + Utils.currentTime());
-            return stream.post(value, currentTime);
+
+            data.add(new DataPointDouble(value, currentTime));
         }
 
-        return false;
+        return data;
     }
 
-    private Vfile getOrCreateStreamFile(String path) {
-        if (resource == null || (resource != null && resource.owner == null)) {
-            Logger.error("[StreamParser] user does not exist.");
-            return null;
+    private Stream getOrCreateStream(String path) {
+        Argument.absolutePath(path);
+
+        State.notNull(resource);
+        State.notNull(resource.owner);
+
+        Stream s = Stream.getByUserPath(resource.owner, path);
+
+        if (s == null) {
+            s = Stream.create(path, new Stream(resource.owner, resource));
         }
-        if (path == null) {
-            Logger.error("[Path] Null.");
-            return null;
-        }
-        Vfile f = FileSystem.readFile(resource.owner, path);
-        if (f == null) {
-            f = FileSystem.addFile(resource.owner, path);
-        } else if (f.getType() == Vfile.Filetype.DIR) {
-            int i = 0;
-            do {
-                f = FileSystem.addFile(resource.owner, path + "\\newstream" + Integer.toString(i));
-            } while (!FileSystem.fileExists(resource.owner,
-                    path + "\\newstream" + Integer.toString(i++)));
-        }
-        if (f.getType() == Vfile.Filetype.FILE) {
-            Stream stream = f.getLink();
-            if (stream == null) {
-                stream = Stream.create(new Stream(resource.owner, this.resource));
-                f.setLink(stream);
-                Logger.info("[StreamParser] Creating stream at: " + resource.owner.getUsername()
-                        + path);
-            }
-            return f;
-        }
-        Logger.error("[StreamParser] couldn't get or create a stream file in " + path);
-        return null;
+
+        return s;
     }
 
     public static StreamParser create(StreamParser parser) {
-        if (parser.resource != null && parser.inputParser != null) {
-            if (parser.stream == null) {
-                if (parser.streamVfilePath == null) {
-                    parser.streamVfilePath =
-                            "/" + parser.resource.label + "/newstream_"
-                                    + (new Random(new Date().getTime()).nextInt(10000));
-                } else if (!parser.streamVfilePath.startsWith("/")) {
-                    parser.streamVfilePath = "/" + parser.streamVfilePath;
-                }
-                parser.stream = parser.getOrCreateStreamFile(parser.streamVfilePath).linkedStream;
-            }
-            parser.save();
-            return parser;
-        } else {
-            Logger.warn("[StreamParser] Could not create parser for " + parser.resource.label
-                    + ", resource or input bad");
-            if (parser.resource == null) {
-                Logger.warn("[StreamParser] resource null");
-            }
-            if (parser.inputParser == null) {
-                Logger.warn("[StreamParser] input parser null");
-            }
+        Argument.notNull(parser.resource);
+        Argument.notNull(parser.inputParser);
+
+        return create("/" + parser.resource.label, parser);
+    }
+
+    public static StreamParser create(String streamPath, StreamParser parser) {
+        Argument.absolutePath(streamPath);
+        Argument.notNull(parser.resource);
+        Argument.notNull(parser.inputParser);
+
+        if (parser.stream == null) {
+            parser.stream = parser.getOrCreateStream(streamPath);
         }
-        Logger.warn("[StreamParser] Could not create parser for " + parser.resource.label);
-        return null;
+
+        parser.save();
+
+        return parser;
     }
 
     public static void delete(Long id) {
         find.ref(id).delete();
+    }
+
+    public static List<StreamParser> forResource(Resource res) {
+        return find.where().eq("resource", res).findList();
     }
 }

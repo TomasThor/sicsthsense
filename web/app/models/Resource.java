@@ -1,84 +1,82 @@
 /*
- * Copyright (c) 2013, Swedish Institute of Computer Science All rights reserved. Redistribution and
- * use in source and binary forms, with or without modification, are permitted provided that the
- * following conditions are met: * Redistributions of source code must retain the above copyright
- * notice, this list of conditions and the following disclaimer. * Redistributions in binary form
- * must reproduce the above copyright notice, this list of conditions and the following disclaimer
- * in the documentation and/or other materials provided with the distribution. * Neither the name of
- * The Swedish Institute of Computer Science nor the names of its contributors may be used to
- * endorse or promote products derived from this software without specific prior written permission.
+ * Copyright (c) 2013, Swedish Institute of Computer Science
+ * All rights reserved.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *     * Redistributions of source code must retain the above copyright
+ *       notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above copyright
+ *       notice, this list of conditions and the following disclaimer in the
+ *       documentation and/or other materials provided with the distribution.
+ *     * Neither the name of The Swedish Institute of Computer Science nor the
+ *       names of its contributors may be used to endorse or promote products
+ *       derived from this software without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR
- * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
- * FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE SWEDISH INSTITUTE OF
- * COMPUTER SCIENCE BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
- * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
- * OF SUCH DAMAGE.
- */
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE SWEDISH INSTITUTE OF COMPUTER SCIENCE BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-/*
- * Description: TODO:
+ * Authors:
+ *  26/08/2013 Adrian Kündig (adkuendi@ethz.ch)
+ *  Before     Unknown
  */
 
 package models;
 
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.UUID;
+import com.avaje.ebean.Ebean;
+import controllers.ScalaUtils;
+import controllers.Utils;
+import logic.Argument;
+import logic.Updater;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
-
-import javax.persistence.CascadeType;
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.Id;
-import javax.persistence.ManyToOne;
-import javax.persistence.OneToMany;
-import javax.persistence.Table;
-import javax.persistence.UniqueConstraint;
-import javax.persistence.Version;
-
 import play.Logger;
 import play.data.validation.Constraints.Required;
 import play.db.ebean.Model;
-import play.libs.F;
 import play.libs.F.Promise;
-import play.mvc.Http.Request;
+import protocol.GenericRequest;
+import protocol.Request;
 import protocol.Response;
 import protocol.coap.CoapProtocol;
 import protocol.http.HttpProtocol;
+import rx.Observable;
+import scala.collection.immutable.Map;
 import scala.concurrent.Future;
+import scala.concurrent.duration.FiniteDuration;
 
-import com.avaje.ebean.Ebean;
-
-import controllers.ScalaUtils;
-import controllers.Utils;
+import javax.persistence.*;
+import java.net.URI;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 @Entity
-@Table(name = "resources", uniqueConstraints = {@UniqueConstraint(columnNames = {"owner_id", "parent_id",
-        "label"})})
-public class Resource extends Operator {
-
+@Table(name = "resources", uniqueConstraints = {@UniqueConstraint(columnNames = {"owner_id",
+        "parent_id", "label"})})
+public class Resource extends Model {
     @Id
     public Long id;
-    @ManyToOne
+
+    @ManyToOne(optional = false)
     public User owner;
+
     @Required
     public String label = "NewResource" + Utils.timeStr(Utils.currentTime());
-    public Long pollingPeriod = 0L;
-    public Long lastPolled = 0L;
-    public Long lastPosted = 0L;
-    @ManyToOne
+
+    public long pollingPeriod = 0L;
+    public long lastPolled = 0L;
+    public long lastPosted = 0L;
+
+    @ManyToOne()
     public Resource parent = null;
     // if parent is not null, pollingUrl should be a subpath under parent
     // never use field access. Always use getter...
@@ -86,17 +84,25 @@ public class Resource extends Operator {
     public String pollingAuthenticationKey = null;
     public String description = "";
 
-    /** Secret key for authenticating posts coming from outside */
+    /**
+     * Secret key for authenticating posts coming from outside
+     */
     @Column(name = "secret_key")
     public String key; // key is a reserved keyword in mysql
 
-    @OneToMany(mappedBy = "parent")
+    @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL)
+    public List<Representation> representations = new ArrayList<Representation>();
+
+    @OneToMany(mappedBy = "resource", cascade = CascadeType.ALL)
+    public List<ResourceLog> logs = new ArrayList<ResourceLog>();
+
+    @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL)
     public List<Resource> subResources = new ArrayList<Resource>();
 
     @OneToMany(mappedBy = "resource", cascade = CascadeType.ALL)
     public List<StreamParser> streamParsers = new ArrayList<StreamParser>();
 
-    @OneToMany(mappedBy = "resource")
+    @OneToMany(mappedBy = "resource", cascade = CascadeType.ALL)
     public List<Stream> streams = new ArrayList<Stream>();
 
     @Version
@@ -109,8 +115,8 @@ public class Resource extends Operator {
 
     public static Model.Finder<Long, Resource> find = new Model.Finder<Long, Resource>(Long.class, Resource.class);
 
-    public Resource(Resource parent, User owner, String label, Long pollingPeriod,
-            String pollingUrl, String pollingAuthenticationKey, String description) {
+    public Resource(Resource parent, User owner, String label, long pollingPeriod,
+                    String pollingUrl, String pollingAuthenticationKey, String description) {
         super();
         this.parent = parent;
         this.label = label;
@@ -123,13 +129,13 @@ public class Resource extends Operator {
         this.description = description;
     }
 
-    public Resource(User owner, String label, Long pollingPeriod, String pollingUrl,
-            String pollingAuthenticationKey) {
+    public Resource(User owner, String label, long pollingPeriod, String pollingUrl,
+                    String pollingAuthenticationKey) {
         this(null, owner, label, pollingPeriod, pollingUrl, pollingAuthenticationKey, "");
     }
 
-    public Resource(String label, Long pollingPeriod, String pollingUrl,
-            String pollingAuthenticationKey) {
+    public Resource(String label, long pollingPeriod, String pollingUrl,
+                    String pollingAuthenticationKey) {
         this(null, null, label, pollingPeriod, pollingUrl, pollingAuthenticationKey, "");
     }
 
@@ -149,25 +155,32 @@ public class Resource extends Operator {
 			return "/users/"+owner.getId()+"/resources/"+id;
 		}
 
-		public boolean isUnused() {
-			if (lastPolled==0 && lastPosted==0) { return true; }
-			return false;
-		}
+    public boolean isUnused() {
+        if (lastPolled == 0 && lastPosted == 0) {
+            return true;
+        }
+        return false;
+    }
 
     public String getPollingUrl() {
         return pollingUrl;
     }
 
     public void setPollingUrl(String pollingUrl) {
-			if (pollingUrl==null) {Logger.warn("Trying to set URL to null!"); return;}
-			if (pollingUrl.endsWith("/")) {
-				pollingUrl = pollingUrl.substring(0, pollingUrl.length() - 1);
-			}
-			this.pollingUrl = pollingUrl;
+        if (pollingUrl == null) {
+            Logger.warn("Trying to set URL to null!");
+            return;
+        }
+        if (pollingUrl.endsWith("/")) {
+            pollingUrl = pollingUrl.substring(0, pollingUrl.length() - 1);
+        }
+        this.pollingUrl = pollingUrl;
 			//rebuildEngineResource(this.owner.getId(), this.id);
     }
 
-    /** Call to create, or update an access token */
+    /**
+     * Call to create, or update an access token
+     */
     public String updateKey() {
         String newKey = UUID.randomUUID().toString();
         key = newKey;
@@ -181,25 +194,23 @@ public class Resource extends Operator {
         return key;
     }
 
-    public boolean canRead(User user) {
-        return (owner.equals(user)); // || isShare(user) || publicAccess;
-    }
-
     public String getUrl() {
         String path = "";
         if (parent != null &&  parent.hasUrl()) {
-//            if (parent.getUrl().endsWith("/")) {
-//                path = parent.getUrl().substring(0, parent.getUrl().length() - 1);
-//            } else {
-//                path = parent.getUrl();
-//            }
-					path = parent.getUrl();
+            // if (parent.getUrl().endsWith("/")) {
+            // path = parent.getUrl().substring(0, parent.getUrl().length() - 1);
+            // } else {
+            // path = parent.getUrl();
+            // }
+            path = parent.getUrl();
         }
-				if (getPollingUrl()==null) {return null;}
+        if (getPollingUrl() == null) {
+            return null;
+        }
         path += getPollingUrl();
 
-        if (!path.equalsIgnoreCase("") && !path.startsWith("http://") && !path.startsWith("https://")
-                && !path.startsWith("coap://")) {
+        if (!path.equalsIgnoreCase("") && !path.startsWith("http://")
+                && !path.startsWith("https://") && !path.startsWith("coap://")) {
             path = "http://" + path;
         }
 
@@ -210,99 +221,79 @@ public class Resource extends Operator {
         return (Utils.isValidURL(getUrl()));
     }
 
-    public Promise<Response> request(String method, Map<String, String[]> headers,
-            Map<String, String[]> queryString, String body) {
+    public Promise<Response> request() {
         // Get Url and parse default parameters
-        final String url = getUrl();
-        final Map<String, String[]> params = ScalaUtils.parseQueryString(url);
+        final URI uri = URI.create(getUrl());
+        final Map<String, String[]> headers =  ScalaUtils.emptyMap();
+        final Map<String, String[]> params = ScalaUtils.parseQueryString(uri.getQuery());
 
-        // Update default parameters with parameters passed in as argument
-        params.putAll(queryString);
+        // Create the Request
+        final Request req =
+                new GenericRequest(uri, "GET", headers, params, "");
+
+        return request(req);
+    }
+
+    public boolean isPoll() {
+        return pollingPeriod > 0;
+    }
+
+    public boolean isPush() {
+        return pollingPeriod == 0;
+    }
+
+    public boolean isObserve() {
+        return pollingPeriod == -1;
+    }
+
+    public FiniteDuration getPollingPeriodDuration() {
+        return FiniteDuration.apply(pollingPeriod, TimeUnit.SECONDS);
+    }
+
+    public Promise<Response> request(String method, Map<String, String[]> headers,
+                                     Map<String, String[]> queryString, String body) {
+        if (method == null) throw new IllegalArgumentException();
+        if (headers == null) headers = ScalaUtils.emptyMap();
+        if (queryString == null) queryString = ScalaUtils.emptyMap();
+
+        // Get Url and parse parameters
+        final URI uri = URI.create(getUrl());
+        final Map<String, String[]> params = ScalaUtils.parseQueryString(uri.getQuery(), queryString);
+
+        // Create the Request
+        final Request req = new GenericRequest(uri, method, headers, params, body);
+
+        return request(req);
+    }
+
+    public Promise<Response> request(Request req) {
+        final URI uri = req.uri();
 
         // Create connection depending on protocol
-        if (url.startsWith("http") || url.startsWith("https")) {
-            final Future<Response> promise =
-                    HttpProtocol.request(url, method, headers, params, body);
+        if (uri.getScheme().equalsIgnoreCase("http") || uri.getScheme().equalsIgnoreCase("https")) {
+            final Future<Response> promise = HttpProtocol.request(req);
             return new Promise<Response>(promise);
-        } else if (url.startsWith("coap")) {
-            final Future<Response> promise =
-                    CoapProtocol.request(url, method, headers, params, body);
+        } else if (uri.getScheme().equalsIgnoreCase("coap")) {
+            final Future<Response> promise = CoapProtocol.request(req);
             return new Promise<Response>(promise);
+        } else {
+            throw new IllegalStateException("Unknown protocol in uri: " + getUrl());
         }
-
-        return null;
     }
 
-    // register asychronous polling of data
-    private Promise<Response> asynchPoll() {
-        final Resource thisResource = this;
-        final Promise<Response> promise =
-                request("GET", new HashMap<String, String[]>(), new HashMap<String, String[]>(), "");
+    public Observable<Response> observe() {
+        // Get Url and parse default parameters
+        final URI uri = URI.create(getUrl());
+        final Map<String, String[]> params = ScalaUtils.parseQueryString(uri.getQuery());
 
-        // Update the lastPolled time
-        lastPolled = Utils.currentTime();
-        update();
-
-        return promise.map(new F.Function<Response, Response>() {
-            public Response apply(Response response) {
-                // Log request
-                // String textBody = response.getBody();
-                // Logger.info("Incoming data: " +
-                // response.getHeader("Content-type")
-                // + textBody);
-                // Stream parsers should handle data parsing and response type
-                // checking..
-                Long currentTime = Utils.currentTime();
-
-                boolean parsedSuccessfully = false;
-                String msgs = "";
-                for (StreamParser sp : streamParsers) {
-                    try {
-                        parsedSuccessfully |= sp.parseResponse(response, currentTime);
-                    } catch (Exception e) {
-                        msgs +=
-                                e.getMessage() + e.getStackTrace()[0].toString() + e.toString()
-                                        + "\n";
-                        Logger.error("Exception: " + thisResource.label + ": asynchPoll(): " + msgs);
-                    }
-                }
-                // Logger.info("[asynchPoll] before resourceLog");
-                ResourceLog resourceLog = new ResourceLog(thisResource, response, thisResource.lastPolled, currentTime);
-                // Logger.info("[asynchPoll] after resourceLog");
-
-                resourceLog = ResourceLog.createOrUpdate(resourceLog);
-                // Logger.info("[asynchPoll] after resourceLog create");
-
-                resourceLog.updateParsedSuccessfully(parsedSuccessfully);
-                if (!msgs.equalsIgnoreCase("")) {
-                    resourceLog.updateMessages(msgs);
-                }
-
-                return response;
-            }
-        });
-    }
-
-    public boolean poll() {
-        // perform a poll() if it is time
-        if (!hasUrl()) {
-            return false;
+        // Create connection depending on protocol
+        if (uri.getScheme().equalsIgnoreCase("http") || uri.getScheme().equalsIgnoreCase("https")) {
+            return HttpProtocol.observe(uri, params);
+        } else if (uri.getScheme().equalsIgnoreCase("coap")) {
+            return CoapProtocol.observe(uri, params);
+        } else {
+            throw new IllegalStateException("Unknown protocol in uri: " + getUrl());
         }
-
-        long currentTime = Utils.currentTime();
-        // Logger.info("time: "+currentTime+" last polled "+lastPolled+" period: "+pollingPeriod);
-        if ((lastPolled + (pollingPeriod * 1000)) > currentTime) {
-            return false;
-        }
-        // Logger.info("Poll() happening!");
-
-        // TODO: A race is happening between checking for the lastPolled and
-        // starting an async poll.
-        // The responsibility of checking for polling time should happen in
-        // asyncPoll.
-        asynchPoll();
-
-        return true;
     }
 
     public Boolean checkKey(String token) {
@@ -316,88 +307,39 @@ public class Resource extends Operator {
         return null;
     }
 
-    public void setPeriod(Long period) {
-			this.pollingPeriod = period;
-			rebuildEngineResource(this.owner.getId(), this.id);
-    }
-
-    public boolean parseAndPost(Request req, Long currentTime) throws Exception {
-				//Logger.info("Parsing and Posting");
-        boolean result = false;
-        if (streamParsers != null) {
-					for (StreamParser sp : streamParsers) {
-						//Logger.info("Applying to parser: ");
-						if (sp != null) {
-							//Logger.info("handing request to stream parser:");
-							// Logger.info("New request: " + req.body().asText());
-							result |= sp.parseRequest(req, currentTime);
-						}
-					}
-        }
-				this.lastPosted = Utils.currentTime();
-        return result;
-    }
-
     public void updateResource(Resource resource) {
         this.label = resource.label;
-        // this.key = resource.getKey();
         this.pollingPeriod = resource.pollingPeriod;
-        this.lastPolled = resource.lastPolled;
-        this.lastPosted = resource.lastPosted;
         this.pollingUrl = resource.getPollingUrl();
-        this.parent = resource.parent;
         this.description = resource.description;
-        this.pollingAuthenticationKey = resource.pollingAuthenticationKey;
+
         if (key == null || "".equalsIgnoreCase(key)) {
             updateKey();
         }
-        update();
+
+        save();
+
         // update indexes
         Resource.index(this);
 				rebuildEngineResource(this.owner.getId(), this.id);
     }
 
     public void verify() {
-    	this.label=label.replaceAll("[\\/:\"*?<>|']+", "");
+        this.label = label.replaceAll("[\\/:\"*?<>|']+", "");
     }
 
     @Override
     public void update() {
-    	verify();
-    	super.update();
+        verify();
+        super.update();
 			rebuildEngineResource(this.owner.getId(), this.id);
     }
 
     @Override
     public void save() {
-    	verify();
-    	super.save();
+        verify();
+        super.save();
 			rebuildEngineResource(this.owner.getId(), this.id);
-    }
-
-    @Override
-    public void delete() {
-        this.pollingPeriod = 0L;
-        // remove references
-				// Liam: stopped detaching resources, so they are deleted
-        //Stream.dattachResource(this);
-        ResourceLog.deleteByResource(this);
-        // Indexer thisIndexer = Indexer.find.byId(id.toString());
-        // if(thisIndexer != null) {
-        // thisIndexer.deleteAsync();
-        // //TODO: check for success
-        // }
-        // delete sub resources and their sub resources, etc...
-        List<Resource> subResList = Ebean.find(Resource.class).select("id, parent, pollingPeriod").where().eq("parent_id", this.id).findList();
-        for (Resource sub : subResList) {
-            sub.delete();
-        }
-				List<Stream> streams = Ebean.find(Stream.class).where().eq("resource_id",this.id).findList();
-				for (Stream stream: streams) {
-					stream.delete();
-				}
-        super.delete();
-				rebuildEngineResource(this.owner.getId(), this.id);
     }
 
     public static Resource getById(Long id) {
@@ -436,17 +378,37 @@ public class Resource extends Operator {
         return resource;
     }
 
-    public static Resource getByUserLabel(User user, Resource parent, String label) {
-        Resource resource = find.select("id, owner, label, parent").where().eq("owner", user).eq("parent", parent).eq("label", label).findUnique();
-        return resource;
+    public static boolean hasAccess(Long id, User user) {
+        Resource resource = find.byId(id);
+        return resource != null && resource.owner.equals(user);
+    }
+
+    public static boolean labelExists(User user, Resource parent, String label) {
+        Argument.notNull(user);
+        Argument.notEmpty(label);
+
+        return
+                find.select("id, owner, label, parent")
+                        .where()
+                        .eq("owner", user)
+                        .eq("parent", parent)
+                        .eq("label", label)
+                        .findRowCount() > 0;
     }
 
     public static List<Resource> availableResources(User user) {
-        // should add public resources...
-        return user.resourceList;
+        Argument.notNull(user);
+
+        return
+            Resource.find
+                .where()
+                .eq("owner", user)
+                .findList();
     }
 
     public static Resource create(User user) {
+        Argument.notNull(user);
+
         Resource resource = new Resource(user);
         // Liam: not sure if we need an index creation here?
         // Beshr: I added it in the other create()
@@ -467,28 +429,33 @@ public class Resource extends Operator {
     }
 
     public static Resource create(Resource resource) {
-        if (resource.owner != null) {
-            if (getByUserLabel(resource.owner, resource.parent, resource.label) != null) {
-                resource.label =
-                        resource.label + new Random(new Date().getTime()).nextInt() + "_at_"
-                                + (new Date().toString());
-            }
-            resource.save();
-            resource.updateKey();
-            Resource.index(resource);
-            return resource;
+        Argument.notNull(resource);
+        Argument.notNull(resource.owner);
+
+        if (!Utils.isNullOrWhitespace(resource.label) &&
+                labelExists(resource.owner, resource.parent, resource.label)) {
+            resource.label =
+                    resource.label + new Random(new Date().getTime()).nextInt() + "_at_"
+                            + (new Date().toString());
         }
-				rebuildEngineResource(resource.owner.getId(), resource.id);
-        return null;
+
+        resource.save();
+        resource.updateKey();
+
+        Resource.index(resource);
+
+        return resource;
     }
+				rebuildEngineResource(resource.owner.getId(), resource.id);
 
     public static void delete(Long id) {
-        Resource resource = find.ref(id);
-        if (resource != null) resource.delete();
-				rebuildEngineResource(resource.owner.getId(), resource.id);
+        Updater.stopObserve(id);
+
+        Ebean.delete(Resource.getById(id));
 
         // Liam: need to delete index for this resource
         // Beshr: Maybe in the resource.delete()?
+        // TODO: Adrian: Or here because I deleted resource.delete()
     }
 
 

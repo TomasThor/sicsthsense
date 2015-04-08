@@ -5,7 +5,7 @@
 
 @tbField(field: Field, label: String, className: String="", typeName: String ="text", readOnly: Boolean = false, placeHolder: String = "", required: Boolean = false, value: String=null) = {
 	@if(field != null) {
-	@if(label != null && label != "") { 
+	@if(label != null && label != "") {
 		<div class="control-group">
 			<label class="control-label" for="@field.id">@label</label>
 			<div class="controls">
@@ -42,14 +42,14 @@
 <a href="@routes.Public.about()#@apiLocation" class="helptooltip" data-toggle="tooltip" title="@text"><i class="icon-question-sign"></i></a>
 }
 
-@numberOfParsers = @{myForm("streamParserWrapers").indexes().length}
+@numberOfParsers = @{myForm("streamParserWrappers").indexes().length}
 
 @streamParserGroupLabels(hidden: Boolean, className: String = "") = {
 <div class="@if(hidden){hidden} row-fluid @className controls controls-row streamParsersLabels">
-<span class="span3" for="@{myForm("streamParserWrapers")("inputParser").id}">Parser (JSON/Regex) @helpMark("Regex for text input or JSON node path for JSON input","postingDataHelp")</span>
-<span class="span3" for="@{myForm("streamParserWrapers")("timeformat").id}">Date/Time format @helpMark("Required if extracting timestamp information along with data","parserHelp")</span>
-<span class="span2" for="@{myForm("streamParserWrapers")("inputType").id}">Content-type @helpMark("Internet media type for incoming data","parserHelp")</span>
-<span class="span3" for="@{myForm("streamParserWrapers")("vfilePath").id}">Stream name @helpMark("Path for generated stream","postingDataHelp")</span>
+<span class="span3" for="@{myForm("streamParserWrappers")("vfilePath").id}">Stream Path @helpMark("File path for generated stream","postingDataHelp")</span>
+<span class="span3" for="@{myForm("streamParserWrappers")("inputParser").id}">Parser (Regex/JSON) @helpMark("Regex for text input or JSON node path for JSON input","postingDataHelp")</span>
+<span class="span3" for="@{myForm("streamParserWrappers")("timeformat").id}">Date/Time format @helpMark("Required if extracting timestamp information along with data","parserHelp")</span>
+<span class="span2" for="@{myForm("streamParserWrappers")("inputType").id}">Content-type @helpMark("Internet media type for incoming data","parserHelp")</span>
 </div>
 <div class="@if(!hidden){hidden} streamParsersLabelsAddParserText">
 Click <a class="addParser btn-link "><span class="icon-plus icon-white"></span></a> to add parsers.
@@ -59,6 +59,7 @@ Click <a class="addParser btn-link "><span class="icon-plus icon-white"></span><
 @streamParserGroup(field: Field, className: String = "", modifyStreamPath: Boolean = true, deleteParser: Boolean = false) = {
 <div class="row-fluid parser controls controls-row @className" data-parserId="@{field("parserId").value}">
 <input form="@resourceFormId" type="hidden" id="@field("parserId").id" name="@field("parserId").name" value="@field("parserId").value" readonly="readonly" size="0">
+<input form="@resourceFormId" class="span3 resourceStreamPath" type="text" required id="@field("vfilePath").id" name="@field("vfilePath").name" value="@field("vfilePath").value" @if(!modifyStreamPath){ readonly } else { placeholder="Stream path"}>
 <input form="@resourceFormId" class="span3" type="text" id="@field("inputParser").id" name="@field("inputParser").name" value="@field("inputParser").value" placeholder="expression or /jsonnode/name">
 <input form="@resourceFormId" class="span3" type="text" id="@field("timeformat").id" name="@field("timeformat").name" value="@field("timeformat").value" placeholder="fill in if posting timestamps">
   <select form="@resourceFormId" class="span2" id="@field("inputType").id" name="@field("inputType").name" selected="@field("inputType").value">
@@ -66,7 +67,6 @@ Click <a class="addParser btn-link "><span class="icon-plus icon-white"></span><
 		<option value="application/json" @if(field("inputType").value.toString.contains("json")){selected="selected"}>application/json</option>
     <option value="text/plain" @if(field("inputType").value.toString.contains("text")){ selected="selected" }>text/plain</option>
   </select>
-<input form="@resourceFormId" class="span3 resourceStreamPath" type="text" required id="@field("vfilePath").id" name="@field("vfilePath").name" value="@field("vfilePath").value" @if(!modifyStreamPath){ readonly } else { placeholder="Stream path"}>
 	<i class="removeParser btn btn-danger pull-right" data-delete="false" @if(deleteParser){data-parserId="@{field("parserId").value}"}else{data-parserId="-1"}><span class="icon-trash icon-white"></span></i>
 @*<input form="@resourceFormId" type="text" id="@field("inputType").id" name="@field("inputType").name" value="@field("inputType").value" placeholder="Input type">*@
 </div>
@@ -110,19 +110,19 @@ Click <a class="addParser btn-link "><span class="icon-plus icon-white"></span><
 		      <p><strong>Oops</strong> Please fix all errors</p>
 	      </div>
 	      }
-	      
+
   <h1>@title</h1>
-     
+
 	@helper.form(action = resourceFormAction, 'id -> resourceFormId) {
 	      <fieldset>
 		      <legend>Parameters
 						<span class="pull-right">
 						@if(!autoParserForm) {
-						<span class="btn-group">	
+						<span class="btn-group">
 							<a href="#confirmDeleteResourceModal" role="button" class="btn btn-danger btn-small" data-toggle="modal"><i class="icon-trash icon-white"></i> Delete</a>
 						</span>
 						}
-						<span class="btn-group">	
+						<span class="btn-group">
 							<a href="@routes.CtrlResource.resources()" class="btn btn-small"><i class="icon-remove"></i></a>
 							<button type="submit" name="update" class="btn btn-primary btn-small" id="updateResource" form="@resourceFormId"><i class="icon-ok icon-white"></i> Save</button>
 	      		</span>
@@ -171,11 +171,11 @@ Click <a class="addParser btn-link "><span class="icon-plus icon-white"></span><
 				<textarea class="span10" wrap="soft" id="@myForm("description").id" name="@myForm("description").name" value="" placeholder="Resource description..." >@myForm("description").value</textarea>
 				</div>
 				<br />
-			} 
+			}
 				</fieldset>
 			<!-- end modify resource-->
   }
-  
+
 	@if(!autoParserForm) {
 		@interactWithResource(myForm("id").value.toLong, thisResource.getUrl())
 	}
@@ -183,22 +183,22 @@ Click <a class="addParser btn-link "><span class="icon-plus icon-white"></span><
 	<!-- Parsers -->
 
 <fieldset>
-		      <legend>Data Parsers 
+		      <legend>Parsers
 <span class="pull-right">
 <a class="addParser btn btn-success btn-small"><span class="icon-plus icon-white"></span></a>
 </span></legend>
 		      <div id="parsers" resourceId="@myForm("id").value">
-						
+
 						@streamParserGroupLabels(numberOfParsers <= 0)
-			      @repeat(myForm("streamParserWrapers"), min=0) { spw =>
+			      @repeat(myForm("streamParserWrappers"), min=0) { spw =>
 			        @streamParserGroup(spw, className="", modifyStreamPath= autoParserForm, deleteParser= !autoParserForm)
 			      }
-						
+
 			      @**
 			      * Keep an hidden block that will be used as template for Javascript copy code
 			      **@
 						<div class="parsers_template">
-			      	@streamParserGroup( myForm("streamParserWrapers[x]"), className = "", modifyStreamPath=true, deleteParser=false )
+			      	@streamParserGroup( myForm("streamParserWrappers[x]"), className = "", modifyStreamPath=true, deleteParser=false )
 			      </div>
 		      </div>
 
@@ -227,12 +227,11 @@ Click <a class="addParser btn-link "><span class="icon-plus icon-white"></span><
   <!-- Log view --->
 	     @if(!autoParserForm) {
   			<br /><br />
-				@logViewPage(ResourceLog.getByResource(Resource.get(myForm("id").value.toLong, Secured.getCurrentUser()), false),"Log of last post")
-				@logViewPage(ResourceLog.getByResource(Resource.get(myForm("id").value.toLong, Secured.getCurrentUser()), true),"Log of last poll")
+				@logViewPage(ResourceLog.getByResource(Resource.get(myForm("id").value.toLong, Secured.getCurrentUser())), "Last Log")
 			}
-			
+
   </div>
-  
+
 </div>
 
 }

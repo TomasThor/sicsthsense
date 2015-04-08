@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, Swedish Institute of Computer Science
+ * Copyright (c) 2013, Institute for Pervasive Computing, ETH Zurich.
  * All rights reserved.
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -11,41 +11,24 @@
  *     * Neither the name of The Swedish Institute of Computer Science nor the
  *       names of its contributors may be used to endorse or promote products
  *       derived from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE SWEDISH INSTITUTE OF COMPUTER SCIENCE BE LIABLE 
+ * DISCLAIMED. IN NO EVENT SHALL THE SWEDISH INSTITUTE OF COMPUTER SCIENCE BE LIABLE
  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
  * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
  * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
  * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-/* Description:
- * TODO:
- * */
+ * Authors:
+ *  26/08/2013 Adrian Kündig (adkuendi@ethz.ch)
+ */
 
-package controllers;
+package logic;
 
-import java.util.List;
-
-import models.Resource;
-import play.mvc.Controller;
-
-public class Poller extends Controller {
-  
-  public static void pollAll() {
-		//Logger.info("Poller pollAll()");
-    List<Resource> withPolling = Resource.find.where()
-        .gt("pollingPeriod", 0)
-        .findList();
-    for(Resource resource: withPolling) {
-			//Logger.info("Poller poll a resource");
-			if (resource!=null) {
-				resource.poll();
-			}
-    }      
-  }
+public enum ResultCode {
+    Ok, NotFound, InternalError, TimedOut
 }

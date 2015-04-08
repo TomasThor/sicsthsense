@@ -11,22 +11,27 @@
  *     * Neither the name of The Swedish Institute of Computer Science nor the
  *       names of its contributors may be used to endorse or promote products
  *       derived from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE SWEDISH INSTITUTE OF COMPUTER SCIENCE BE LIABLE 
+ * DISCLAIMED. IN NO EVENT SHALL THE SWEDISH INSTITUTE OF COMPUTER SCIENCE BE LIABLE
  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
  * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
  * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
  * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 
 /* Description:
  * TODO:
  * */
 package controllers;
+
+import org.codehaus.jackson.JsonNode;
+import play.Logger;
+import scala.concurrent.duration.FiniteDuration;
 
 import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
@@ -36,35 +41,18 @@ import java.net.URLDecoder;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
-
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-
-import play.Logger;
+import java.util.concurrent.TimeUnit;
 
 public class Utils {
 
-	public static long currentTime() {
+    public static long currentTime() {
 		// return System.currentTimeMillis();
 		return new Date().getTime();
 	}
 
-	public static String concatPath(String... paths) {
-		String combined = "";
-		for (String path : paths) {
-			while (path.startsWith("/"))
-				path = path.substring(1);
-			while (path.endsWith("/"))
-				path = path.substring(0, path.length() - 1);
-			combined += "/" + path;
-		}
-		if (combined.contains("://")) {
-			return combined.substring(1);
-		} else {
-			return combined;
-		}
-	}
+    public static FiniteDuration currentTimeAsDuration() {
+        return FiniteDuration.apply(currentTime(), TimeUnit.MILLISECONDS);
+    }
 
 	public static String timeStr(long time) {
 		time /= 1000;
@@ -100,7 +88,7 @@ public class Utils {
 		if (surl == null) {
 			return false;
 		}
-		
+
 		try {
 			new URL(surl).toURI();
 		} catch (MalformedURLException e) {
@@ -108,10 +96,10 @@ public class Utils {
 		} catch (URISyntaxException e) {
 			return false;
 		}
-		
+
 		return true;
 	}
-	
+
 	//decode path from URI encoding (e.g. base64)
 	public static String decodePath(String path) {
 		try {
@@ -141,4 +129,7 @@ public class Utils {
 		return map;
 	}
 
+    public static boolean isNullOrWhitespace(String s) {
+        return s == null || s.trim().isEmpty();
+    }
 }
