@@ -218,7 +218,11 @@
 			<artifactId>jackson-annotations</artifactId>
 			<version>${jackson-version}</version>
 		</dependency>
-
+		<dependency>
+			<groupId>org.eclipse.californium</groupId>
+			<artifactId>californium-core</artifactId>
+			<version>1.0.0-M3</version>
+    		</dependency>
   </dependencies>
 </project>
 

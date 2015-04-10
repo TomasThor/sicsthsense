@@ -36,6 +36,7 @@ import java.io.DataOutputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URI;
 import java.net.MalformedURLException;
 import javax.net.ssl.HttpsURLConnection;
 
@@ -53,6 +54,10 @@ import se.sics.sicsthsense.core.Parser;
 import se.sics.sicsthsense.model.ParseData;
 import se.sics.sicsthsense.jdbi.StorageDAO;
 
+import org.eclipse.californium.core.CoapClient;
+import org.eclipse.californium.core.CoapResponse;
+import org.eclipse.californium.core.coap.MediaTypeRegistry;
+
 public class Poller extends UntypedActor {
 	private final Logger logger = LoggerFactory.getLogger(Poller.class);
 	public long resourceId;
@@ -60,7 +65,7 @@ public class Poller extends UntypedActor {
 	private ObjectMapper mapper;
 	private ParseData parsedata;
 	private StorageDAO storage;
-	private URL urlobj;
+	private URI uriobj;
 	private String inputLine;
 	private List<Parser> parsers;
 
@@ -84,9 +89,9 @@ public class Poller extends UntypedActor {
 			return;
 		}
 		try {
-			urlobj = new URL(url);
+			uriobj = new URI(url);
 		} catch (Exception e) {
-			//logger.error("Bad url: "+e);
+			logger.error("Bad url: "+e);
 			return;
 		}
 		parsers = storage.findParsersByResourceId(resourceId);
@@ -141,35 +146,51 @@ public class Poller extends UntypedActor {
 			} else { // "probe"
 				//logger.info("Received String message: to probe: {}", url);
 				//getSender().tell(message, getSelf());
-				if (urlobj==null) { logger.error("URL object was null!"); return;}
-				HttpURLConnection con = (HttpURLConnection)urlobj.openConnection();
-				con.setRequestMethod("GET"); // optional default is GET
-				con.setInstanceFollowRedirects(true);
-				con.setRequestProperty("User-Agent", "SICSthSense"); //add request header
+				if (uriobj==null) { logger.error("URL object was null!"); return;}
 
-				try {
-					int responseCode = con.getResponseCode();
-					//logger.info("Sending 'GET' request to URL : " + url+" Response Code : " + responseCode);
+				if(uriobj.getScheme().equals("http")){
+                                        HttpURLConnection con = (HttpURLConnection)uriobj.toURL().openConnection();
+                                        con.setRequestMethod("GET"); // optional default is GET
+                                        con.setInstanceFollowRedirects(true);
+                                        con.setRequestProperty("User-Agent", "SICSthSense"); //add request header
 
-					BufferedReader in = new BufferedReader( new InputStreamReader(con.getInputStream()));
-					StringBuffer response = new StringBuffer();
-					while ((inputLine = in.readLine()) != null) { response.append(inputLine); }
-					in.close();
+                                        try {
+                                                int responseCode = con.getResponseCode();
+                                                //logger.info("Sending 'GET' request to URL : " + url+" Response Code : " + responseCode);
 
-					storage.polledResource(resourceId,System.currentTimeMillis());
-					//System.out.println(response.toString());
-					applyParsers(resourceId,response.toString());
-				} catch (Exception e) {
-					ResourceLog rl = ResourceLog.createOrUpdate(storage, resourceId);
-					String msg = "Network problem: "+e+" URL: "+url;
-					//logger.error(msg);
-					//e.printStackTrace();
-					rl.update(false, true, msg, System.currentTimeMillis());
-					rl.save();
-				}
+                                                BufferedReader in = new BufferedReader( new InputStreamReader(con.getInputStream()));
+                                                StringBuffer response = new StringBuffer();
+                                                while ((inputLine = in.readLine()) != null) { response.append(inputLine); }
+                                                in.close();
+
+                                                storage.polledResource(resourceId,System.currentTimeMillis());
+                                                //System.out.println(response.toString());
+                                                applyParsers(resourceId,response.toString());
+                                        } catch (Exception e) {
+                                                ResourceLog rl = ResourceLog.createOrUpdate(storage, resourceId);
+                                                String msg = "Network problem: "+e+" URL: "+url;
+                                                //logger.error(msg);
+                                                //e.printStackTrace();
+                                                rl.update(false, true, msg, System.currentTimeMillis());
+                                                rl.save();
+                                        }
+                                } else if(uriobj.getScheme().equals("coap")){
+                                        CoapClient client = new CoapClient(uriobj);
+                                        CoapResponse response = null;
+                                        response = client.get(MediaTypeRegistry.TEXT_PLAIN);
+                                        if (response != null) {
+                                                storage.polledResource(resourceId,System.currentTimeMillis());
+                                                applyParsers(resourceId,response.getResponseText());
+                                        } else {
+                                                ResourceLog rl = ResourceLog.createOrUpdate(storage, resourceId);
+                                                String msg = "Network problem CoAP URL: "+url;
+                                                rl.update(false, true, msg, System.currentTimeMillis());
+                                                rl.save();
+                                        }
+                                }
 			}
     } else {
-      unhandled(message);
-		}
+            unhandled(message);
+    }
   }
 }
