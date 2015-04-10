@@ -139,7 +139,7 @@ public class StreamParser extends Model {
 
         if (resource.owner != null) {
             Vfile f = StreamDrive.read(resource.owner, path);
-            this.stream = (f != null) ? f.stream : null;
+            this.stream = (f != null) ? f.getLink() : null;
 
         }
     }

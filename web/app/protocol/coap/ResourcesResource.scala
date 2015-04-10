@@ -70,6 +70,9 @@ class ResourcesResource(subpath: Option[String] = None) extends CoapResource("ap
   }
 
   override def performPOST(request: POSTRequest): Unit = secured(request) {
+    val baos = new java.io.ByteArrayOutputStream
+    Console.withOut(baos)(print(keyParam.get))
+    println(baos)
     if (keyParam.isEmpty) {
       return respond(request, CodeRegistry.RESP_BAD_REQUEST, "Key required")
     }
@@ -90,7 +93,7 @@ class ResourcesResource(subpath: Option[String] = None) extends CoapResource("ap
 
   // Don't allow PUT, it is not defined from the HTTP side
   override def performPUT(request: PUTRequest): Unit =
-    request.respond(CodeRegistry.RESP_FORBIDDEN)
+    request.respond(CodeRegistry.RESP_BAD_REQUEST)
 
   // Don't allow DELETE, we have now possibility to check authorization
   override def performDELETE(request: DELETERequest): Unit =

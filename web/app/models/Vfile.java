@@ -70,16 +70,16 @@ public class Vfile extends Model {
     public Filetype type;
 
     @OneToOne(optional = true)
-    Stream stream;
+    Stream linkedStream;
 
     public static Model.Finder<Long, Vfile> find = new Model.Finder<Long, Vfile>(Long.class, Vfile.class);
 
-    public Vfile(String path, User owner, Filetype type, Stream stream) {
+    public Vfile(String path, User owner, Filetype type, Stream linkedStream) {
         super();
         this.path = path;
         this.owner = owner;
         this.type = type;
-        this.stream = stream;
+        this.linkedStream = linkedStream;
     }
 
     public Vfile() {
@@ -132,14 +132,14 @@ public class Vfile extends Model {
     }
 
     public void setLink(Stream linkedStream) {
-        this.stream = linkedStream;
+        this.linkedStream = linkedStream;
         if (id != 0) {
             this.save();
         }
     }
 
     public Stream getLink() {
-        return stream;
+        return linkedStream;
     }
 
     //remove invalid characters

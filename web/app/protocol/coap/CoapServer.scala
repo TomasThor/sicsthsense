@@ -34,7 +34,7 @@ import ch.ethz.inf.vs.californium.endpoint.ServerEndpoint
 class CoapServer(port: Int) extends ServerEndpoint(port) {
   addResource(new ResourcesResource())
 
-  addResource(new StreamsResource())
+  addResource(new StreamsResource(Some("44d80c7f-5822-4433-b31e-1006a57d9350")))
 
   addResource(new ProxyResource())
 }

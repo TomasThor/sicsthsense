@@ -113,7 +113,7 @@ public class Stream extends Model implements Comparable<Stream> {
     @ManyToOne()
     public Resource resource;
 
-    @OneToOne(mappedBy = "stream", cascade = CascadeType.ALL)
+    @OneToOne(mappedBy = "linkedStream", cascade = CascadeType.ALL)
     public Vfile file;
 
     @OneToMany(cascade = CascadeType.ALL, mappedBy = "stream")
@@ -444,7 +444,7 @@ public class Stream extends Model implements Comparable<Stream> {
             return null;
         }
 
-        return file.stream;
+        return file.getLink();
     }
 
     public static void delete(Long id) {

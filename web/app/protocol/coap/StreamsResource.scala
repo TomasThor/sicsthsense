@@ -53,6 +53,10 @@ class StreamsResource(subpath: Option[String] = None) extends CoapResource("api/
     else new StreamsResource(Option(path))
 
   override def performGET(request: GETRequest): Unit = secured(request) {
+    val baos = new java.io.ByteArrayOutputStream
+    Console.withOut(baos)(print(keyParam.get))
+    println(baos)
+
     if (keyParam.isEmpty) {
       return respond(request, CodeRegistry.RESP_BAD_REQUEST, "Key required")
     }

@@ -85,13 +85,16 @@ class CoapResource(val path: String) extends LocalResource(path) {
         hasTried = true
       }
     }
-
+    val baos = new java.io.ByteArrayOutputStream
+    Console.withOut(baos)(print(body))
+    println(baos)
     if (hasTried)
       request.respond(CodeRegistry.RESP_NOT_ACCEPTABLE)
     else
       return request.respond(
         CodeRegistry.RESP_CONTENT,
-        Json.toJson(body).toString(),
+        /* Json.toJson(body).toString(), */
+        body.toString(),
         MediaTypeRegistry.APPLICATION_JSON
       )
   }
