@@ -59,6 +59,8 @@ import akka.actor.UntypedActor;
 import akka.actor.Cancellable;
 import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
+import java.util.logging.Level;
+import org.eclipse.californium.core.CaliforniumLogger;
 
 import se.sics.sicsthsense.resources.*;
 import se.sics.sicsthsense.jdbi.*;
@@ -67,9 +69,18 @@ import se.sics.sicsthsense.auth.*;
 import se.sics.sicsthsense.auth.openid.*;
 import se.sics.sicsthsense.model.security.*;
 
+import org.eclipse.californium.core.CoapServer;
+import org.eclipse.californium.core.network.CoAPEndpoint;
+import se.sics.sicsthsense.resources.coap.ResourceCoapResource;
+
 public class EngineApplication extends Application<EngineConfiguration> {
 	private final Logger logger = LoggerFactory.getLogger(EngineApplication.class);
 	private PollSystem pollSystem;
+        
+        static {
+            CaliforniumLogger.initialize();
+            CaliforniumLogger.setLevel(Level.CONFIG);
+        }
 
 	public static void main(String[] args) throws Exception {
 		new EngineApplication().run(args);
@@ -129,5 +140,11 @@ public class EngineApplication extends Application<EngineConfiguration> {
 
 		// Attach Atmosphere servlet
 		addServlet(environment);
+                
+                // Coap server startup
+                CoapServer server = new CoapServer();
+                server.add(new ResourceCoapResource());
+                server.addEndpoint(new CoAPEndpoint(5683));
+                server.start();
 	}
 }

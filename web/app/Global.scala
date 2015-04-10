@@ -37,9 +37,9 @@ object Global extends GlobalSettings {
     val periodicMonitor = akkaSystem.actorOf(Props[PeriodicMonitor])
     akkaSystem.scheduler.schedule(0.seconds, 5.seconds, periodicMonitor, "tick")
     
-    val coapServer = new CoapServer(app.configuration.getInt("coap.port").get)
+    /*val coapServer = new CoapServer(app.configuration.getInt("coap.port").get)
 
-    coapServer.start()
+    coapServer.start()*/
   }
 
   override def onStop(app: Application) {
