@@ -59,6 +59,15 @@ import akka.actor.UntypedActor;
 import akka.actor.Cancellable;
 import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.security.GeneralSecurityException;
+import java.security.KeyStore;
+import java.security.PrivateKey;
+import java.security.cert.Certificate;
 import java.util.logging.Level;
 import org.eclipse.californium.core.CaliforniumLogger;
 
@@ -68,18 +77,30 @@ import se.sics.sicsthsense.core.*;
 import se.sics.sicsthsense.auth.*;
 import se.sics.sicsthsense.auth.openid.*;
 import se.sics.sicsthsense.model.security.*;
+import se.sics.sicsthsense.resources.coap.ResourceCoapResource;
+import se.sics.sicsthsense.resources.coap.StreamCoapResource;
 
 import org.eclipse.californium.core.CoapServer;
 import org.eclipse.californium.core.network.CoAPEndpoint;
-import se.sics.sicsthsense.resources.coap.ResourceCoapResource;
+import org.eclipse.californium.core.network.config.NetworkConfig;
+import org.eclipse.californium.scandium.DTLSConnector;
+import org.eclipse.californium.scandium.ScandiumLogger;
+import org.eclipse.californium.core.coap.CoAP;
+import org.eclipse.californium.scandium.dtls.pskstore.InMemoryPskStore;
 
 public class EngineApplication extends Application<EngineConfiguration> {
 	private final Logger logger = LoggerFactory.getLogger(EngineApplication.class);
 	private PollSystem pollSystem;
+        private static final String TRUST_STORE_PASSWORD = "rootPass";
+	private final static String KEY_STORE_PASSWORD = "endPass";
+	private static final String KEY_STORE_LOCATION = "certs/keyStore.jks";
+        private static final String TRUST_STORE_LOCATION = "certs/trustStore.jks";
         
         static {
             CaliforniumLogger.initialize();
             CaliforniumLogger.setLevel(Level.CONFIG);
+            ScandiumLogger.initialize();
+            ScandiumLogger.setLevel(Level.ALL);
         }
 
 	public static void main(String[] args) throws Exception {
@@ -141,10 +162,41 @@ public class EngineApplication extends Application<EngineConfiguration> {
 		// Attach Atmosphere servlet
 		addServlet(environment);
                 
-                // Coap server startup
+                // CoAP server startup
                 CoapServer server = new CoapServer();
                 server.add(new ResourceCoapResource());
-                server.addEndpoint(new CoAPEndpoint(5683));
+                server.add(new StreamCoapResource());
+                server.addEndpoint(new CoAPEndpoint(CoAP.DEFAULT_COAP_PORT));
+                
+                // Add DTLS CoAP server endpoint
+                try {
+                    // Pre-shared secrets
+                    InMemoryPskStore pskStore = new InMemoryPskStore();
+                    pskStore.setKey("Client_identity", "secretPSK".getBytes());
+                    
+                    // load the trust store
+                    KeyStore trustStore = KeyStore.getInstance("JKS");
+                    InputStream inTrust = new FileInputStream(TRUST_STORE_LOCATION);
+                    trustStore.load(inTrust, TRUST_STORE_PASSWORD.toCharArray());
+
+                    // You can load multiple certificates if needed
+                    Certificate[] trustedCertificates = new Certificate[1];
+                    trustedCertificates[0] = trustStore.getCertificate("root");
+                    
+                    // load the key store
+                    KeyStore keyStore = KeyStore.getInstance("JKS");
+                    InputStream in = new FileInputStream(KEY_STORE_LOCATION);
+                    keyStore.load(in, KEY_STORE_PASSWORD.toCharArray());
+                    
+                    DTLSConnector connector = new DTLSConnector(new InetSocketAddress(CoAP.DEFAULT_COAP_SECURE_PORT), trustedCertificates);
+                    connector.getConfig().setPskStore(pskStore);
+                    connector.getConfig().setPrivateKey((PrivateKey)keyStore.getKey("server", KEY_STORE_PASSWORD.toCharArray()), keyStore.getCertificateChain("server"), true);
+                    server.addEndpoint(new CoAPEndpoint(connector, NetworkConfig.getStandard()));
+                    
+                } catch (Exception e) {
+                    System.err.println("Could not load the keystore or add dtls endpoint to coap server");
+                    e.printStackTrace();
+                }
                 server.start();
 	}
 }

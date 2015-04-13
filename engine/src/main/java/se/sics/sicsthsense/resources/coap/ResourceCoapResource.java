@@ -50,6 +50,7 @@ import se.sics.sicsthsense.jdbi.*;
 import se.sics.sicsthsense.model.*;
 
 import org.eclipse.californium.core.coap.CoAP.ResponseCode;
+import org.eclipse.californium.core.coap.MediaTypeRegistry;
 
 public class ResourceCoapResource extends CoapResource{
     private final StorageDAO storage;
@@ -160,7 +161,7 @@ public class ResourceCoapResource extends CoapResource{
             }
             
             try {
-                exchange.respond(ResponseCode.CONTENT, mapper.writeValueAsString(resource));
+                exchange.respond(ResponseCode.CONTENT, mapper.writeValueAsString(resource), MediaTypeRegistry.APPLICATION_JSON);
             } catch (JsonProcessingException ex) {
                 java.util.logging.Logger.getLogger(ResourceCoapResource.class.getName()).log(Level.SEVERE, null, ex);
             }
@@ -189,7 +190,7 @@ public class ResourceCoapResource extends CoapResource{
             }
             
             try {
-                exchange.respond(ResponseCode.CONTENT, mapper.writeValueAsString(resources));
+                exchange.respond(ResponseCode.CONTENT, mapper.writeValueAsString(resources), MediaTypeRegistry.APPLICATION_JSON);
             } catch (JsonProcessingException ex) {
                 java.util.logging.Logger.getLogger(ResourceCoapResource.class.getName()).log(Level.SEVERE, null, ex);
             }
@@ -246,7 +247,7 @@ public class ResourceCoapResource extends CoapResource{
         }
         resource = storage.findResourceById(resourceId);
         try {
-            exchange.respond(ResponseCode.CREATED, mapper.writeValueAsString(resource));
+            exchange.respond(ResponseCode.CREATED, mapper.writeValueAsString(resource), MediaTypeRegistry.APPLICATION_JSON);
         } catch (JsonProcessingException ex) {
             java.util.logging.Logger.getLogger(ResourceCoapResource.class.getName()).log(Level.SEVERE, null, ex);
         }  

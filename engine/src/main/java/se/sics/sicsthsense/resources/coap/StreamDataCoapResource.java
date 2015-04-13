@@ -48,6 +48,7 @@ import se.sics.sicsthsense.core.*;
 import se.sics.sicsthsense.jdbi.*;
 
 import org.eclipse.californium.core.coap.CoAP.ResponseCode;
+import org.eclipse.californium.core.coap.MediaTypeRegistry;
 
 public class StreamDataCoapResource extends CoapResource{
     private StorageDAO storage;
@@ -142,7 +143,7 @@ public class StreamDataCoapResource extends CoapResource{
                 //return Utils.resp(Status.OK, csvmapper.writer(schema).writeValueAsString(rv), null);
                 exchange.respond(ResponseCode.BAD_REQUEST, "Error: Can't parse data!");
             } else { // default dump to JSON
-                exchange.respond(ResponseCode.CONTENT, mapper.writeValueAsString(rv));
+                exchange.respond(ResponseCode.CONTENT, mapper.writeValueAsString(rv), MediaTypeRegistry.APPLICATION_JSON);
             }
         } catch (Exception e) {
             exchange.respond(ResponseCode.BAD_REQUEST, "Error: Can't parse data!");

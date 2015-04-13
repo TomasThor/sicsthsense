@@ -223,6 +223,18 @@
 			<artifactId>californium-core</artifactId>
 			<version>1.0.0-M3</version>
     		</dependency>
+		<dependency>
+			<groupId>org.eclipse.californium</groupId>
+			<artifactId>scandium</artifactId>
+			<version>1.0.0-M3</version>
+		</dependency>
   </dependencies>
+  <repositories>
+    <repository>
+      <id>repo.eclipse.org</id>
+      <name>Californium Repository - Snapshots</name>
+      <url>https://repo.eclipse.org/content/repositories/californium-snapshots/</url>
+    </repository>
+  </repositories>
 </project>
 

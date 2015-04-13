@@ -46,6 +46,7 @@ import se.sics.sicsthsense.core.*;
 import se.sics.sicsthsense.jdbi.*;
 
 import org.eclipse.californium.core.coap.CoAP.ResponseCode;
+import org.eclipse.californium.core.coap.MediaTypeRegistry;
 
 public class StreamCoapResource extends CoapResource{
     private StorageDAO storage;
@@ -170,7 +171,7 @@ public class StreamCoapResource extends CoapResource{
             stream.setLabel(storage.findPathByStreamId(stream.getId()));
             
             try {
-                exchange.respond(ResponseCode.CONTENT, mapper.writeValueAsString(stream));
+                exchange.respond(ResponseCode.CONTENT, mapper.writeValueAsString(stream), MediaTypeRegistry.APPLICATION_JSON);
             } catch (JsonProcessingException ex) {
                 java.util.logging.Logger.getLogger(StreamCoapResource.class.getName()).log(Level.SEVERE, null, ex);
             }
@@ -198,7 +199,7 @@ public class StreamCoapResource extends CoapResource{
             }
             
             try {
-                exchange.respond(ResponseCode.CONTENT, mapper.writeValueAsString(streams));
+                exchange.respond(ResponseCode.CONTENT, mapper.writeValueAsString(streams), MediaTypeRegistry.APPLICATION_JSON);
             } catch (JsonProcessingException ex) {
                 java.util.logging.Logger.getLogger(StreamCoapResource.class.getName()).log(Level.SEVERE, null, ex);
             }
@@ -262,7 +263,7 @@ public class StreamCoapResource extends CoapResource{
         }
         stream = storage.findStreamById(streamId); // need fresh DB version
         try {
-            exchange.respond(ResponseCode.CREATED, mapper.writeValueAsString(stream));
+            exchange.respond(ResponseCode.CREATED, mapper.writeValueAsString(stream), MediaTypeRegistry.APPLICATION_JSON);
         } catch (JsonProcessingException ex) {
             java.util.logging.Logger.getLogger(StreamCoapResource.class.getName()).log(Level.SEVERE, null, ex);
         }  

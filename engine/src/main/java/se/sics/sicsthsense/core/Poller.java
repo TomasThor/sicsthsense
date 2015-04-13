@@ -32,31 +32,40 @@ import java.util.List;
 import java.util.Set;
 import java.util.HashSet;
 import java.io.BufferedReader;
-import java.io.DataOutputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
-import java.net.URL;
 import java.net.URI;
 import java.net.MalformedURLException;
-import javax.net.ssl.HttpsURLConnection;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import akka.actor.UntypedActor;
-import akka.event.Logging;
-import akka.event.LoggingAdapter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.DeserializationConfig;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import static com.sun.jersey.core.header.LinkHeader.uri;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 
-import se.sics.sicsthsense.core.Parser;
+import java.security.KeyStore;
+import java.security.PrivateKey;
+import java.security.cert.Certificate;
 import se.sics.sicsthsense.model.ParseData;
 import se.sics.sicsthsense.jdbi.StorageDAO;
 
 import org.eclipse.californium.core.CoapClient;
 import org.eclipse.californium.core.CoapResponse;
 import org.eclipse.californium.core.coap.MediaTypeRegistry;
+import org.eclipse.californium.core.coap.CoAP;
+import org.eclipse.californium.core.network.CoAPEndpoint;
+import org.eclipse.californium.core.network.Endpoint;
+import org.eclipse.californium.core.network.EndpointManager.ClientMessageDeliverer;
+import org.eclipse.californium.core.network.config.NetworkConfig;
+
+import org.eclipse.californium.scandium.DTLSConnector;
+import org.eclipse.californium.scandium.dtls.pskstore.InMemoryPskStore;
 
 public class Poller extends UntypedActor {
 	private final Logger logger = LoggerFactory.getLogger(Poller.class);
@@ -68,6 +77,12 @@ public class Poller extends UntypedActor {
 	private URI uriobj;
 	private String inputLine;
 	private List<Parser> parsers;
+        private CoapClient secureclient = null;
+        
+        private static final String TRUST_STORE_PASSWORD = "rootPass";
+	private final static String KEY_STORE_PASSWORD = "endPass";
+	private static final String KEY_STORE_LOCATION = "certs/keyStore.jks";
+        private static final String TRUST_STORE_LOCATION = "certs/trustStore.jks";
 
 	public Poller(StorageDAO storage, ObjectMapper mapper, long resourceId, String url) throws MalformedURLException {
 		this.resourceId=resourceId;
@@ -84,17 +99,74 @@ public class Poller extends UntypedActor {
 		Resource resource = storage.findResourceById(resourceId);
 		if (resource==null) {logger.error("Resource does not exist: "+resourceId); return; }
 		this.url=resource.getPolling_url();
-		if (this.url==null || this.url=="") {
+		if (this.url==null || this.url.equals("")) {
 			logger.error("Url not valid");
 			return;
 		}
+                URI olduri = null;
+                if(uriobj != null) olduri = uriobj;
 		try {
 			uriobj = new URI(url);
 		} catch (Exception e) {
 			logger.error("Bad url: "+e);
 			return;
 		}
+                
+                // Stop old DTLS connection to and start new
+                if(olduri != null && olduri.getScheme().equals(CoAP.COAP_SECURE_URI_SCHEME)
+                        && (!olduri.getHost().equals(uriobj.getHost())
+                        || !uriobj.getScheme().equals(CoAP.COAP_SECURE_URI_SCHEME))
+                        && secureclient != null){
+                    if (secureclient.getEndpoint()!=null) {
+                        secureclient.getEndpoint().stop();
+                    }
+                    secureclient = null;
+                }
+                
+                // Start new DTLS connection
+                if(secureclient == null && uriobj.getScheme().equals(CoAP.COAP_SECURE_URI_SCHEME)){
+                    secureclient = new CoapClient(uriobj);
+                    setDTLS();
+                }
+                
 		parsers = storage.findParsersByResourceId(resourceId);
+	}
+        
+        public void setDTLS(){
+		try{
+                        InMemoryPskStore pskStore = new InMemoryPskStore();
+			/*InetAddress IPAddressServer = InetAddress.getByName(uriobj.getHost()); 
+			pskStore.addKnownPeer(new InetSocketAddress(IPAddressServer, uriobj.getPort()), "Client_identity", "secretPSK".getBytes());*/
+			pskStore.setKey("Client_identity", "secretPSK".getBytes());
+
+			// load the trust store
+			KeyStore trustStore = KeyStore.getInstance("JKS");
+			InputStream inTrust = new FileInputStream(TRUST_STORE_LOCATION);
+			trustStore.load(inTrust, TRUST_STORE_PASSWORD.toCharArray());
+
+			// You can load multiple certificates if needed
+			Certificate[] trustedCertificates = new Certificate[1];
+			trustedCertificates[0] = trustStore.getCertificate("root");
+
+			// load the key store
+			KeyStore keyStore = KeyStore.getInstance("JKS");
+			InputStream in = new FileInputStream(KEY_STORE_LOCATION);
+			keyStore.load(in, KEY_STORE_PASSWORD.toCharArray()); 
+
+
+			DTLSConnector connector = new DTLSConnector(new InetSocketAddress(0), trustedCertificates);
+			connector.getConfig().setPskStore(pskStore);
+	        	connector.getConfig().setPrivateKey((PrivateKey)keyStore.getKey("client", KEY_STORE_PASSWORD.toCharArray()), keyStore.getCertificateChain("client"), true);
+
+			Endpoint dtlsEndpoint = new CoAPEndpoint(connector, NetworkConfig.getStandard());
+			dtlsEndpoint.setMessageDeliverer(new ClientMessageDeliverer());
+			dtlsEndpoint.start();
+                        
+			secureclient.setEndpoint(dtlsEndpoint);
+
+		} catch(Exception e) {
+                        logger.info("Failed to connect to DTLS Endpoint");
+		}
 	}
 
 	public void applyParsers(long resourceId, String data) {
@@ -147,8 +219,7 @@ public class Poller extends UntypedActor {
 				//logger.info("Received String message: to probe: {}", url);
 				//getSender().tell(message, getSelf());
 				if (uriobj==null) { logger.error("URL object was null!"); return;}
-
-				if(uriobj.getScheme().equals("http")){
+				if(uriobj.getScheme().equals("http") || uriobj.getScheme().equals("https")){
                                         HttpURLConnection con = (HttpURLConnection)uriobj.toURL().openConnection();
                                         con.setRequestMethod("GET"); // optional default is GET
                                         con.setInstanceFollowRedirects(true);
@@ -174,7 +245,8 @@ public class Poller extends UntypedActor {
                                                 rl.update(false, true, msg, System.currentTimeMillis());
                                                 rl.save();
                                         }
-                                } else if(uriobj.getScheme().equals("coap")){
+                                        
+                                } else if(uriobj.getScheme().equals(CoAP.COAP_URI_SCHEME)){
                                         CoapClient client = new CoapClient(uriobj);
                                         CoapResponse response = null;
                                         response = client.get(MediaTypeRegistry.TEXT_PLAIN);
@@ -184,6 +256,20 @@ public class Poller extends UntypedActor {
                                         } else {
                                                 ResourceLog rl = ResourceLog.createOrUpdate(storage, resourceId);
                                                 String msg = "Network problem CoAP URL: "+url;
+                                                rl.update(false, true, msg, System.currentTimeMillis());
+                                                rl.save();
+                                        }
+                                        
+                                } else if(uriobj.getScheme().equals(CoAP.COAP_SECURE_URI_SCHEME)){
+                                        secureclient.setURI(uriobj.toString());
+                                        CoapResponse response = null;
+                                        response = secureclient.get(MediaTypeRegistry.TEXT_PLAIN);
+                                        if (response != null) {
+                                                storage.polledResource(resourceId,System.currentTimeMillis());
+                                                applyParsers(resourceId,response.getResponseText());
+                                        } else {
+                                                ResourceLog rl = ResourceLog.createOrUpdate(storage, resourceId);
+                                                String msg = "Network problem CoAPs URL: "+url;
                                                 rl.update(false, true, msg, System.currentTimeMillis());
                                                 rl.save();
                                         }
