@@ -23,17 +23,13 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 
-/* Description: Jersey Resource for SicsthSense Resources. Handles config of Resources
- * contains the Parsers and Streams of the associated Resource.
+/* Description: Description: Coap Resource for SicsthSense Resources.
  * TODO:
  * */
 package se.sics.sicsthsense.resources.coap;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
-import javax.ws.rs.Produces;
-import javax.ws.rs.Consumes;
-import javax.ws.rs.core.MediaType;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response.Status;
 
@@ -54,11 +50,7 @@ import se.sics.sicsthsense.jdbi.*;
 import se.sics.sicsthsense.model.*;
 
 import org.eclipse.californium.core.coap.CoAP.ResponseCode;
-import org.eclipse.californium.core.coap.OptionSet;
 
-// publicly reachable path of the resource
-@Produces(MediaType.APPLICATION_JSON)
-@Consumes(MediaType.APPLICATION_JSON)
 public class ResourceCoapResource extends CoapResource{
     private final StorageDAO storage;
     private final AtomicLong counter;
@@ -67,12 +59,12 @@ public class ResourceCoapResource extends CoapResource{
     private final Logger logger = LoggerFactory.getLogger(ResourceCoapResource.class);
     public ParseData parseData;
     List<Parser> parsers;
-    // constructor with the system's stoarge and poll system.
-
+    
     public ResourceCoapResource() {
         this("resources");  
     }
     
+    // constructor with the system's stoarge and poll system.
     public ResourceCoapResource(String name) {
         super(name);
         getAttributes().setTitle("Sicsth Sense Resources");
@@ -84,29 +76,110 @@ public class ResourceCoapResource extends CoapResource{
         this.mapper = new ObjectMapper();
     }
     
+    public static Map<String, String> getThreeResourceParameters(CoapExchange exchange){
+        List<String> queryList = exchange.getRequestOptions().getUriQuery();
+        Map<String, String> parameters = new LinkedHashMap<String, String>();
+        for(String query: queryList){
+            int idx = query.indexOf("=");
+            parameters.put(query.substring(0, idx), query.substring(idx + 1));
+        }
+        if(parameters.containsKey("user") && parameters.containsKey("resource") && parameters.containsKey("key")){
+            try {
+                Long.parseLong(parameters.get("user"));
+            } catch(Exception e) {
+                exchange.respond(ResponseCode.BAD_OPTION, "Error: User parameter is not a number!");
+                return null;
+            }
+            try {
+                Long.parseLong(parameters.get("resource"));
+            } catch(Exception e) {
+                exchange.respond(ResponseCode.BAD_OPTION, "Error: Resouce parameter is not a number!");
+                return null;
+            }
+        } else {
+            exchange.respond(ResponseCode.BAD_OPTION, "Error: One or more parameter wrong!");
+            return null;
+        }
+        if(parameters.size() != 3){
+            exchange.respond(ResponseCode.BAD_OPTION, "Error: Not correct number of parameters!");
+            return null;
+        }
+        return parameters;
+    }
+    
+    public static Map<String, String> getTwoResourceParameters(CoapExchange exchange){
+        List<String> queryList = exchange.getRequestOptions().getUriQuery();
+        Map<String, String> parameters = new LinkedHashMap<String, String>();
+        for(String query: queryList){
+            int idx = query.indexOf("=");
+            parameters.put(query.substring(0, idx), query.substring(idx + 1));
+        }
+        if(parameters.containsKey("user") && parameters.containsKey("key")){
+            try {
+                Long.parseLong(parameters.get("user"));
+            } catch(Exception e) {
+                exchange.respond(ResponseCode.BAD_OPTION, "Error: User parameter is not a number!");
+                return null;
+            }
+        } else {
+            exchange.respond(ResponseCode.BAD_OPTION, "Error: One or more parameter wrong!");
+            return null;
+        }
+        if(parameters.size() != 2){
+            exchange.respond(ResponseCode.BAD_OPTION, "Error: Not correct number of parameters!");
+            return null;
+        }
+        return parameters;
+    }
+    
     @Override
     public void handleGET(CoapExchange exchange) {
-        OptionSet opt = exchange.getRequestOptions();
-        List<String> query = opt.getUriQuery();
-        Map<String, String> query_pairs = new LinkedHashMap<String, String>();
-        for(String q: query){
-            int idx = q.indexOf("=");
-            query_pairs.put(q.substring(0, idx), q.substring(idx + 1));
-        }
-        long userId = Long.parseLong(query_pairs.get("user"));
-        String resourceName = query_pairs.get("resource");
-        String key = query_pairs.get("key");
-        
-        if(resourceName == null || resourceName.isEmpty()){
+        int parameterCount = exchange.getRequestOptions().getUriQuery().size();
+        if (parameterCount == 3){
+            Map<String, String> p = getThreeResourceParameters(exchange);
+            if(p == null) return;
+            long userId = Long.parseLong(p.get("user"));
+            String resourceName = p.get("resource");
+            String key = p.get("key");
+            
+            logger.info("Getting user/resource: "+userId+"/"+resourceName);
+            Utils.checkHierarchy(storage,userId);
+            Resource resource = Utils.findResourceByIdName(storage,resourceName,userId);
+            if (resource == null) { 
+                exchange.respond(ResponseCode.NOT_FOUND, "Error: Resource " + resourceName + " does not exist!"); 
+            }
+            if (resource.getOwner_id() != userId) { 
+                exchange.respond(ResponseCode.NOT_FOUND, "Error: User "+userId+" does not own resource " + resourceName); 
+            }
+            User user = storage.findUserById(userId);
+            if (user==null) {
+                throw new WebApplicationException(Status.NOT_FOUND);
+            }
+            if (!user.isAuthorised(key) && !resource.isAuthorised(key)) { 
+                exchange.respond(ResponseCode.FORBIDDEN, "Error: Key does not match! " + key); 
+            }
+            
+            try {
+                exchange.respond(ResponseCode.CONTENT, mapper.writeValueAsString(resource));
+            } catch (JsonProcessingException ex) {
+                java.util.logging.Logger.getLogger(ResourceCoapResource.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            
+        } else if(parameterCount == 2){
+            Map<String, String> p = getTwoResourceParameters(exchange);
+            if(p == null) return;
+            long userId = Long.parseLong(p.get("user"));
+            String key = p.get("key");
+            
             //logger.info("Getting all user "+userId+" resources for visitor "+visitor.toString());
             Utils.checkHierarchy(storage,userId);
             User user = storage.findUserById(userId);
             if (user==null) {
-                    exchange.respond(ResponseCode.NOT_FOUND, new JSONMessage("Error: No userId match.").getMessage());
+                    exchange.respond(ResponseCode.NOT_FOUND, "Error: No userId match.");
             }
             List<Resource> resources = storage.findResourcesByOwnerId(userId);
             if (!user.isAuthorised(key)) {
-                    exchange.respond(ResponseCode.FORBIDDEN, new JSONMessage("Error: Key does not match! "+key).getMessage());
+                    exchange.respond(ResponseCode.FORBIDDEN, "Error: Key does not match! " + key);
                     /*
                     Iterator<Resource> it = resources.iterator();
                     while (it.hasNext()) {
@@ -120,43 +193,19 @@ public class ResourceCoapResource extends CoapResource{
             } catch (JsonProcessingException ex) {
                 java.util.logging.Logger.getLogger(ResourceCoapResource.class.getName()).log(Level.SEVERE, null, ex);
             }
-        } else {
-            logger.info("Getting user/resource: "+userId+"/"+resourceName);
-            Utils.checkHierarchy(storage,userId);
-            Resource resource = Utils.findResourceByIdName(storage,resourceName,userId);
-            if (resource == null) { 
-                exchange.respond(ResponseCode.NOT_FOUND, new JSONMessage("Resource "+resourceName+" does not exist!").getMessage()); 
-            }
-            if (resource.getOwner_id() != userId) { 
-                exchange.respond(ResponseCode.NOT_FOUND, new JSONMessage("User "+userId+" does not own resource "+resourceName).getMessage()); 
-            }
-            User user = storage.findUserById(userId);
-            if (user==null) {
-                throw new WebApplicationException(Status.NOT_FOUND);
-            }
-            if (!user.isAuthorised(key) && !resource.isAuthorised(key)) { 
-                exchange.respond(ResponseCode.FORBIDDEN, new JSONMessage( "Error: Key does not match! "+key).getMessage()); 
-            }
             
-            try {
-                exchange.respond(ResponseCode.CONTENT, mapper.writeValueAsString(resource));
-            } catch (JsonProcessingException ex) {
-                java.util.logging.Logger.getLogger(ResourceCoapResource.class.getName()).log(Level.SEVERE, null, ex);
-            }
+        } else {
+            exchange.respond(ResponseCode.BAD_OPTION, "Error: Not correct number of parameters!");
+            return;
         }
     }
     
     @Override
     public void handlePOST(CoapExchange exchange) {
-        OptionSet opt = exchange.getRequestOptions();
-        List<String> query = opt.getUriQuery();
-        Map<String, String> query_pairs = new LinkedHashMap<String, String>();
-        for(String q: query){
-            int idx = q.indexOf("=");
-            query_pairs.put(q.substring(0, idx), q.substring(idx + 1));
-        }
-        long userId = Long.parseLong(query_pairs.get("user"));
-        String key = query_pairs.get("key");
+        Map<String, String> p = getTwoResourceParameters(exchange);
+        if(p == null) return;
+        long userId = Long.parseLong(p.get("user"));
+        String key = p.get("key");
         String data = exchange.getRequestText();
         Resource resource = null;
         try {
@@ -173,13 +222,13 @@ public class ResourceCoapResource extends CoapResource{
         User user = storage.findUserById(userId);
         if (user==null) {throw new WebApplicationException(Status.NOT_FOUND);}
         if (!user.isAuthorised(key)) { 
-            exchange.respond(ResponseCode.FORBIDDEN, new JSONMessage("Error: Key does not match! "+key).getMessage());
+            exchange.respond(ResponseCode.FORBIDDEN, "Error: Key does not match! " + key);
         }
 
         /*
         // no label duplication allowed
         if (storage.findResourceByLabel(resource.getLabel())!=null) {
-            return Utils.resp(Status.BAD_REQUEST , new JSONMessage("Error: that resource label already exists!"), logger);
+            exchange.respond(ResponseCode.BAD_REQUEST , "Error: that resource label already exists!");
         }*/
 
         resource.setOwner_id(userId); // should know the owner
@@ -189,7 +238,7 @@ public class ResourceCoapResource extends CoapResource{
             rl.setResourceId(resourceId); // for the foreign key constraint
             Utils.insertResourceLog(storage,rl);
         } catch (Exception e) {
-            exchange.respond(ResponseCode.BAD_REQUEST , new JSONMessage("Error: storing the new resource, are the attributes correct?").getMessage());
+            exchange.respond(ResponseCode.BAD_REQUEST , "Error: storing the new resource, are the attributes correct?");
         }
         if (resource.getPolling_period() > 0) {
                 // remake pollers with updated Resource attribtues
@@ -205,16 +254,11 @@ public class ResourceCoapResource extends CoapResource{
     
     @Override
     public void handlePUT(CoapExchange exchange) {
-        OptionSet opt = exchange.getRequestOptions();
-        List<String> query = opt.getUriQuery();
-        Map<String, String> query_pairs = new LinkedHashMap<String, String>();
-        for(String q: query){
-            int idx = q.indexOf("=");
-            query_pairs.put(q.substring(0, idx), q.substring(idx + 1));
-        }
-        long userId = Long.parseLong(query_pairs.get("user"));
-        String resourceName = query_pairs.get("resource");
-        String key = query_pairs.get("key");
+        Map<String, String> p = getThreeResourceParameters(exchange);
+        if(p == null) return;
+        long userId = Long.parseLong(p.get("user"));
+        String resourceName = p.get("resource");
+        String key = p.get("key");
         String data = exchange.getRequestText();
         Resource resource = null;
         try {
@@ -230,7 +274,7 @@ public class ResourceCoapResource extends CoapResource{
         Resource oldresource = Utils.findResourceByIdName(storage,resourceName,userId);
         Utils.checkHierarchy(storage,user,oldresource);
         if (!user.isAuthorised(key) && !resource.isAuthorised(key)) {
-            exchange.respond(ResponseCode.FORBIDDEN, new JSONMessage("Error: Key does not match! "+key).getMessage());
+            exchange.respond(ResponseCode.FORBIDDEN, "Error: Key does not match! " + key);
         }
         Utils.updateResource(storage,oldresource.getId(), resource);
         exchange.respond(ResponseCode.CHANGED);
@@ -238,23 +282,18 @@ public class ResourceCoapResource extends CoapResource{
 
     @Override
     public void handleDELETE(CoapExchange exchange) {
-        OptionSet opt = exchange.getRequestOptions();
-        List<String> query = opt.getUriQuery();
-        Map<String, String> query_pairs = new LinkedHashMap<String, String>();
-        for(String q: query){
-            int idx = q.indexOf("=");
-            query_pairs.put(q.substring(0, idx), q.substring(idx + 1));
-        }
-        long userId = Long.parseLong(query_pairs.get("user"));
-        String resourceName = query_pairs.get("resource");
-        String key = query_pairs.get("key");
+        Map<String, String> p = getThreeResourceParameters(exchange);
+        if(p == null) return;
+        long userId = Long.parseLong(p.get("user"));
+        String resourceName = p.get("resource");
+        String key = p.get("key");
         
         logger.warn("Deleting resourceName:"+resourceName);
         User user = storage.findUserById(userId);
         Resource resource = Utils.findResourceByIdName(storage, resourceName,userId);
         Utils.checkHierarchy(storage,user,resource);
         if (!user.isAuthorised(key) && !resource.isAuthorised(key)) {
-            exchange.respond(ResponseCode.FORBIDDEN, new JSONMessage("Error: Key does not match! "+key+" Only User key deletes a Resource").getMessage());
+            exchange.respond(ResponseCode.FORBIDDEN, "Error: Key does not match! " + key + " Only User key deletes a Resource");
         }
         Utils.deleteResource(storage,resource);
         exchange.respond(ResponseCode.DELETED);
