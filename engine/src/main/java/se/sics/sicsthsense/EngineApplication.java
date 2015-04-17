@@ -79,6 +79,7 @@ import se.sics.sicsthsense.auth.openid.*;
 import se.sics.sicsthsense.model.security.*;
 import se.sics.sicsthsense.resources.coap.ResourceCoapResource;
 import se.sics.sicsthsense.resources.coap.StreamCoapResource;
+import se.sics.sicsthsense.resources.coap.UserCoapResource;
 
 import org.eclipse.californium.core.CoapServer;
 import org.eclipse.californium.core.network.CoAPEndpoint;
@@ -166,6 +167,7 @@ public class EngineApplication extends Application<EngineConfiguration> {
                 CoapServer server = new CoapServer();
                 server.add(new ResourceCoapResource());
                 server.add(new StreamCoapResource());
+		server.add(new UserCoapResource());
                 server.addEndpoint(new CoAPEndpoint(CoAP.DEFAULT_COAP_PORT));
                 
                 // Add DTLS CoAP server endpoint
